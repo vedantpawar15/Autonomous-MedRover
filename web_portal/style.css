@@ -1,3 +1,31 @@
 body {
-    color: rgb(0, 163, 41);
+    background-image: url('assets/images/underMaint Bg Image.png');
+    background-size: cover;      /* Scales image to fill the screen */
+    background-position: center; /* Keeps the robot/subject centered */
+    background-repeat: no-repeat;/* STOPS THE SPREADING/REPEATING */
+    background-attachment: fixed;/* Keeps bg steady when you scroll */
+    min-height: 100vh;           /* Ensures body covers full screen height */
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    background-image: url('assets/images/underMaint Bg Image.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+}
+
+html, body {
+    height: 100%;
+    margin: 0;
+}
+
+main {
+    flex: 1 0 auto;
+}
+
+footer {
+    background: rgba(0, 0, 0, 0.8); /* Darker background for contrast */
+    backdrop-filter: blur(10px);    /* Professional glass effect */
+    flex-shrink: 0;
 }
