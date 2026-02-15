@@ -3,75 +3,309 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hospital Web Portal</title>
+  <title>Autonomous MedRover — Hospital Medicine Delivery</title>
 
   <!-- Bootstrap CSS -->
   <link
     href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
     rel="stylesheet"
   >
-
+  <!-- Bootstrap Icons -->
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+    rel="stylesheet"
+  >
   <!-- Custom CSS -->
   <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
-  <!-- ===== NAVBAR ===== -->
- <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top shadow">
-  <div class="container-fluid position-relative">
+  <!-- ===== NAVBAR — TOP BAR (Dark) ===== -->
+  <div class="nav-top fixed-top">
+    <div class="container d-flex align-items-center">
 
-    <!-- Brand (LEFT) -->
-    <a class="navbar-brand d-flex align-items-center" href="#">
-      <img src="assets/logo/white.png" height="32" class="me-2" alt="Logo">
-      Autonomous MedRover
-    </a>
+      <!-- Brand (Left) -->
+      <a class="nav-top-brand" href="#">
+        <img src="assets/logo/white.png" height="32" alt="Logo">
+        <div class="brand-info">
+          <span class="brand-sub">Hospital Delivery</span>
+          <span class="brand-name">MedRover</span>
+        </div>
+      </a>
 
-    <!-- Toggle (MOBILE) -->
-    <button class="navbar-toggler" type="button"
-      data-bs-toggle="collapse" data-bs-target="#mainNavbar">
-      <span class="navbar-toggler-icon"></span>
-    </button>
+      <!-- Separator -->
+      <div class="nav-separator"></div>
 
-    <!-- Center Menu -->
-    <div class="collapse navbar-collapse justify-content-center" id="mainNavbar">
-      <ul class="navbar-nav position-absolute start-50 translate-middle-x">
-        <li class="nav-item">
-          <a class="nav-link active" href="#">Home</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="#">About</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="#">Services</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="#">Contact</a>
-        </li>
-      </ul>
+      <!-- Delivery Info -->
+      <div class="nav-delivery">
+        <span class="delivery-label"><i class="bi bi-lightning-charge-fill text-warning"></i> Robot delivery to</span>
+        <span class="delivery-select">Select Room <i class="bi bi-chevron-down"></i></span>
+      </div>
+
+      <!-- Right Actions -->
+      <div class="nav-top-right ms-auto d-flex align-items-center">
+        <a href="#" class="nav-top-action">
+          <i class="bi bi-person"></i>
+          <span>Hello, Log in</span>
+        </a>
+        <a href="#" class="nav-top-action">
+          <i class="bi bi-clipboard2-pulse"></i>
+          <span>Orders</span>
+        </a>
+        <a href="#" class="nav-top-action">
+          <i class="bi bi-cart3"></i>
+          <span>Cart</span>
+        </a>
+      </div>
+
+      <!-- Mobile Toggle -->
+      <button class="navbar-toggler d-lg-none ms-2" type="button"
+        data-bs-toggle="collapse" data-bs-target="#subNavbar">
+        <i class="bi bi-list text-dark" style="font-size:1.5rem"></i>
+      </button>
+
     </div>
-
-    <!-- CTA Button (RIGHT) -->
-    <a href="#" class="btn btn-success ms-auto d-none d-lg-inline">
-      Login
-    </a>
-
   </div>
-</nav>
 
+  <!-- ===== NAVBAR — SUB BAR (White) ===== -->
+  <div class="nav-sub">
+    <div class="container">
+      <div class="collapse navbar-collapse show d-lg-flex justify-content-center" id="subNavbar">
+        <ul class="nav-sub-links">
+          <li><a href="#" class="active">Home</a></li>
+          <li><a href="#how-it-works">How It Works</a></li>
+          <li><a href="#features">Features</a></li>
+          <li><a href="#faq">FAQ</a></li>
+          <li><a href="#">Contact</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== HERO SECTION ===== -->
+  <section class="hero-section">
+    <div class="container text-center">
+      <h1 class="hero-title">
+        <span class="text-highlight">Get Medicines Delivered</span>
+        <br>Autonomously to Any Room
+      </h1>
+      <p class="hero-subtitle">
+        Fast, contactless & robot-powered medicine delivery inside your hospital
+      </p>
+
+      <!-- Order Card inside hero -->
+      <div class="order-float-card mx-auto">
+
+        <!-- Section Label -->
+        <div class="card-divider">
+          <span>ORDER &amp; AVAIL MAX DISCOUNTS</span>
+        </div>
+
+        <!-- Search Bar -->
+        <div class="hero-search-wrapper">
+          <i class="bi bi-search hero-search-icon"></i>
+          <input type="text" class="hero-search-input" placeholder="Search for Medicines...">
+          <button class="btn-hero-search">Search</button>
+        </div>
+
+        <!-- Or You Can Order Via -->
+        <div class="or-divider">
+          <span>OR YOU CAN ORDER VIA</span>
+        </div>
+
+        <div class="order-via-row">
+          <a href="#" class="order-via-card">
+            <i class="bi bi-clipboard2-pulse"></i>
+            <span>Browse Medicine List</span>
+          </a>
+          <a href="#" class="order-via-card">
+            <i class="bi bi-telephone-fill"></i>
+            <span>Call Pharmacy Desk</span>
+          </a>
+        </div>
+
+      </div>
+
+      <!-- Divider Badge -->
+      <div class="divider-badge mt-4">
+        <span>ONLY ON MEDROVER</span>
+      </div>
+
+      <!-- Feature Cards Row (below search card) -->
+      <div class="row g-2 justify-content-center mt-3">
+        <div class="col-md-3 col-sm-4">
+          <div class="feature-card">
+            <div class="feature-icon">
+              <i class="bi bi-robot"></i>
+            </div>
+            <div>
+              <h6>Autonomous Robot</h6>
+              <p>Smart navigation</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3 col-sm-4">
+          <div class="feature-card featured">
+            <div class="feature-icon">
+              <i class="bi bi-lightning-charge-fill"></i>
+            </div>
+            <div>
+              <h6>Express Delivery</h6>
+              <p>Fast & contactless</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3 col-sm-4">
+          <div class="feature-card">
+            <div class="feature-icon">
+              <i class="bi bi-broadcast"></i>
+            </div>
+            <div>
+              <h6>Real-time Tracking</h6>
+              <p>Live status updates</p>
+            </div>
+          </div>
+        </div>
+      </div>
 
     </div>
-  </nav>
+  </section>
 
-  <!-- ===== HERO / MAIN SECTION ===== -->
-  <section class="hero">
-    <main class="container text-white">
-    </main>
+  <!-- ===== HOW IT WORKS ===== -->
+  <section class="how-section" id="how-it-works">
+    <div class="container text-center">
+      <h2 class="section-title">How It Works</h2>
+      <p class="section-subtitle">Simple 4-step delivery process</p>
+
+      <div class="row g-4 mt-3">
+        <div class="col-lg-3 col-sm-6">
+          <div class="step-card">
+            <div class="step-number">1</div>
+            <i class="bi bi-clipboard2-pulse step-icon"></i>
+            <h6>Place Order</h6>
+            <p>Staff selects medicine &amp; destination room from the web portal</p>
+          </div>
+        </div>
+        <div class="col-lg-3 col-sm-6">
+          <div class="step-card">
+            <div class="step-number">2</div>
+            <i class="bi bi-database-fill-gear step-icon"></i>
+            <h6>Order Stored</h6>
+            <p>Order is saved to Supabase cloud database instantly</p>
+          </div>
+        </div>
+        <div class="col-lg-3 col-sm-6">
+          <div class="step-card">
+            <div class="step-number">3</div>
+            <i class="bi bi-cpu step-icon"></i>
+            <h6>Robot Picks Up</h6>
+            <p>ESP32 robot detects new order &amp; begins autonomous navigation</p>
+          </div>
+        </div>
+        <div class="col-lg-3 col-sm-6">
+          <div class="step-card">
+            <div class="step-number">4</div>
+            <i class="bi bi-check-circle-fill step-icon"></i>
+            <h6>Delivered!</h6>
+            <p>Medicine delivered to room &amp; order status updated automatically</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== FAQ SECTION ===== -->
+  <section class="faq-section" id="faq">
+    <div class="container">
+      <h2 class="section-title text-center">Frequently Asked Questions</h2>
+
+      <div class="faq-list mx-auto mt-4">
+
+        <details class="faq-item" open>
+          <summary>How does the MedRover robot navigate?</summary>
+          <p>The robot uses IR line-following sensors to follow paths on the hospital floor. It detects junctions to make turns and reach the correct destination room (A, B, or C).</p>
+        </details>
+
+        <details class="faq-item">
+          <summary>Is the delivery truly autonomous?</summary>
+          <p>Yes! Once an order is placed, the ESP32 microcontroller on the robot polls the database, picks up the order, navigates autonomously, and updates the status — all without human intervention.</p>
+        </details>
+
+        <details class="faq-item">
+          <summary>How fast is the delivery?</summary>
+          <p>Delivery time depends on the distance to the destination room. Typically, the robot can deliver medicine within 2–5 minutes inside the hospital premises.</p>
+        </details>
+
+        <details class="faq-item">
+          <summary>What technology stack is used?</summary>
+          <p>The frontend uses HTML, CSS &amp; JavaScript with Bootstrap. The backend uses Supabase (PostgreSQL + REST APIs). The robot runs on an ESP32 with L298N motor driver and IR sensors.</p>
+        </details>
+
+        <details class="faq-item">
+          <summary>Can I track my order?</summary>
+          <p>Yes, the web portal shows real-time order status — Pending, In Transit, or Delivered — updated automatically by the robot.</p>
+        </details>
+
+      </div>
+    </div>
   </section>
 
   <!-- ===== FOOTER ===== -->
-  <footer class="footer text-center text-white py-3">
-    © 2026 Autonomous MedRover
+  <footer class="site-footer">
+    <div class="container">
+      <div class="row g-4">
+
+        <!-- Brand Column -->
+        <div class="col-lg-4 col-md-6">
+          <div class="footer-brand">
+            <img src="assets/logo/white.png" height="32" alt="Logo">
+            <span>Autonomous MedRover</span>
+          </div>
+          <p class="footer-desc">
+            A web-based autonomous hospital medicine delivery system. Built as a Minor Project integrating IoT, robotics, and cloud technologies.
+          </p>
+        </div>
+
+        <!-- Quick Links -->
+        <div class="col-lg-2 col-md-6">
+          <h6 class="footer-heading">Quick Links</h6>
+          <ul class="footer-links">
+            <li><a href="#">Home</a></li>
+            <li><a href="#features">Features</a></li>
+            <li><a href="#how-it-works">How It Works</a></li>
+            <li><a href="#faq">FAQ</a></li>
+          </ul>
+        </div>
+
+        <!-- Tech Stack -->
+        <div class="col-lg-3 col-md-6">
+          <h6 class="footer-heading">Tech Stack</h6>
+          <ul class="footer-links">
+            <li><a href="#">HTML + Bootstrap + JS</a></li>
+            <li><a href="#">Supabase (Database)</a></li>
+            <li><a href="#">ESP32 (IoT Controller)</a></li>
+            <li><a href="#">L298N + IR Sensors</a></li>
+          </ul>
+        </div>
+
+        <!-- Contact -->
+        <div class="col-lg-3 col-md-6">
+          <h6 class="footer-heading">Project Info</h6>
+          <ul class="footer-links">
+            <li><i class="bi bi-mortarboard me-2"></i>Minor Project 2</li>
+            <li><i class="bi bi-hospital me-2"></i>Hospital Automation</li>
+            <li><i class="bi bi-gear me-2"></i>IoT + Robotics</li>
+          </ul>
+        </div>
+
+      </div>
+
+      <hr class="footer-divider">
+      <p class="footer-copy text-center">
+        &copy; 2026 Autonomous MedRover. All Rights Reserved.
+      </p>
+    </div>
   </footer>
 
   <!-- Bootstrap JS -->
