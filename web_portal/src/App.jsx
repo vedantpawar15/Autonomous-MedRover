@@ -3,6 +3,8 @@ import HomePage from './pages/HomePage'
 import SearchPage from './pages/SearchPage'
 import CartPage from './pages/CartPage'
 import SelectRoomPage from './pages/SelectRoomPage'
+import OrderSuccessPage from './pages/OrderSuccessPage'
+import OrdersPage from './pages/OrdersPage'
 
 function App() {
   return (
@@ -11,6 +13,8 @@ function App() {
       <Route path="/search" element={<SearchPage />} />
       <Route path="/cart" element={<CartPage />} />
       <Route path="/select-room" element={<SelectRoomPage />} />
+      <Route path="/order-success" element={<OrderSuccessPage />} />
+      <Route path="/orders" element={<OrdersPage />} />
     </Routes>
   )
 }

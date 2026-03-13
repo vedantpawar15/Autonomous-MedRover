@@ -1,89 +1,154 @@
+import { useState, useMemo, useEffect } from 'react'
 import { useSearchParams, useNavigate, Link } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import { supabase } from '../lib/supabaseClient'
 
-const medicines = [
-  {
-    id: 1,
-    name: 'Dolo 650mg Strip Of 15 Tablets',
-    brand: 'MICRO LABS',
-    qty: '15 Tablet(s) in Strip',
-    price: 24.10,
-    original: 32.13,
-    discount: '25% OFF',
-    rx: true,
-    inCart: true,
-    cartQty: 2
-  },
-  {
-    id: 2,
-    name: 'Leemol 650mg Strip Of 15 Tablets',
-    brand: 'LEEFORD HEALTHCARE LTD',
-    qty: '15 Tablet(s) in Strip',
-    price: 16.70,
-    original: 31.50,
-    discount: '47% OFF',
-    rx: true,
-    inCart: false
-  },
-  {
-    id: 3,
-    name: 'Dolo 500mg Strip Of 15 Tablets',
-    brand: 'MICRO LABS',
-    qty: '15 Tablet(s) in Strip',
-    price: 10.63,
-    original: 14.18,
-    discount: '25% OFF',
-    rx: false,
-    inCart: false
-  },
-  {
-    id: 4,
-    name: 'Dolonex DT 20mg Strip Of 15 Tablets',
-    brand: 'CIPLA LIMITED',
-    qty: '15 Tablet(s) in Strip',
-    price: 201.59,
-    original: 268.79,
-    discount: '25% OFF',
-    rx: true,
-    inCart: false
-  },
-  {
-    id: 5,
-    name: 'Dolo 250mg Bottle Of 60ml Suspension',
-    brand: 'MICRO LABS',
-    qty: '60ml Suspension in Bottle',
-    price: 32.10,
-    original: 42.80,
-    discount: '25% OFF',
-    rx: false,
-    inCart: false
-  },
-  {
-    id: 6,
-    name: 'Dolopar 650mg Strip Of 15 Tablets',
-    brand: 'MICRO LABS',
-    qty: '15 Tablet(s) in Strip',
-    price: 24.08,
-    original: 32.10,
-    discount: '25% OFF',
-    rx: false,
-    inCart: false
-  }
-]
+const formatMedicine = (row) => ({
+  id: row.id,
+  name: row.name,
+  brand: row.brand,
+  qty: row.pack_info,
+  price: Number(row.selling_price),
+  original: Number(row.mrp),
+  discount:
+    row.mrp && row.mrp > 0
+      ? `${Math.round(((row.mrp - row.selling_price) / row.mrp) * 100)}% OFF`
+      : '',
+  rx: !!row.requires_rx,
+  inCart: false,
+  cartQty: 1
+})
 
 function SearchPage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const query = searchParams.get('query') || 'Dolo'
 
+  const [items, setItems] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    const fetchMedicines = async () => {
+      if (!supabase) return
+      setLoading(true)
+      setError('')
+      try {
+        let q = supabase.from('medicines').select('*')
+
+        if (query) {
+          q = q.ilike('name', `%${query}%`)
+        }
+
+        const { data, error: err } = await q.limit(50)
+        if (err) {
+          console.error('Error loading medicines', err)
+          setError('Could not load medicines from server.')
+        } else {
+          // Sync with any existing cart in localStorage
+          let cartById = new Map()
+          try {
+            const raw = window.localStorage.getItem('medrover_cart')
+            if (raw) {
+              const parsed = JSON.parse(raw)
+              if (Array.isArray(parsed)) {
+                cartById = new Map(
+                  parsed.map((item) => [item.id, item.selectedQty || 1])
+                )
+              }
+            }
+          } catch (e) {
+            console.error('Failed to read cart from localStorage on SearchPage', e)
+          }
+
+          const mapped = data.map((row) => {
+            const base = formatMedicine(row)
+            const qty = cartById.get(base.id)
+            if (qty) {
+              return { ...base, inCart: true, cartQty: qty }
+            }
+            return base
+          })
+
+          setItems(mapped)
+        }
+      } catch (e) {
+        console.error('Exception loading medicines', e)
+        setError('Unexpected error loading medicines.')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchMedicines()
+  }, [query])
+
+  // Persist cart to localStorage so CartPage can read it
+  useEffect(() => {
+    const cartPayload = items
+      .filter((med) => med.inCart)
+      .map((med) => ({
+        id: med.id,
+        name: med.name,
+        qtyInfo: med.qty,
+        originalPrice: med.original,
+        currentPrice: med.price,
+        selectedQty: med.cartQty || 1
+      }))
+
+    try {
+      window.localStorage.setItem('medrover_cart', JSON.stringify(cartPayload))
+    } catch (e) {
+      console.error('Failed to persist cart to localStorage', e)
+    }
+  }, [items])
+
+  const filteredItems = useMemo(
+    () =>
+      items.filter((med) =>
+        med.name.toLowerCase().includes(query.toLowerCase())
+      ),
+    [items, query]
+  )
+
+  // Cart count should reflect all items in cart, not just current filter
+  const cartItems = items.filter((med) => med.inCart)
+  const cartCount = cartItems.reduce(
+    (sum, med) => sum + (med.cartQty || 1),
+    0
+  )
+
   const handleNavSearch = (q) => {
-    navigate(`/search?query=${encodeURIComponent(q)}`)
+    const trimmed = q.trim()
+    if (!trimmed) return
+    navigate(`/search?query=${encodeURIComponent(trimmed)}`)
+  }
+
+  const handleAddToCart = (id) => {
+    setItems((prev) =>
+      prev.map((med) =>
+        med.id === id ? { ...med, inCart: true, cartQty: 1 } : med
+      )
+    )
+  }
+
+  const handleQtyChange = (id, qty) => {
+    setItems((prev) =>
+      prev.map((med) =>
+        med.id === id ? { ...med, cartQty: qty } : med
+      )
+    )
   }
 
   return (
     <>
-      <Navbar variant="inner" searchValue={query} onSearch={handleNavSearch} />
+      <Navbar
+        variant="inner"
+        searchValue={query}
+        onSearch={handleNavSearch}
+        cartCount={cartCount}
+      />
 
       {/* ===== SEARCH RESULTS ===== */}
       <section className="search-results-section">
@@ -96,8 +161,13 @@ function SearchPage() {
           <div className="row g-4">
 
             {/* LEFT: Results */}
-            <div className="col-lg-8">
-              {medicines.map((med) => (
+              <div className="col-lg-8">
+              {loading && <p>Loading medicines from MedRover cloud...</p>}
+              {error && <p className="text-danger small">{error}</p>}
+              {!loading && !error && filteredItems.length === 0 && (
+                <p>No medicines found for \"{query}\".</p>
+              )}
+              {!loading && !error && filteredItems.map((med) => (
                 <div className="medicine-card" key={med.id}>
                   <div className="medicine-img">
                     <i className="bi bi-capsule"></i>
@@ -123,13 +193,25 @@ function SearchPage() {
                       </div>
                       <div className="medicine-action">
                         {med.inCart ? (
-                          <select className="qty-select" defaultValue={med.cartQty}>
+                          <select
+                            className="qty-select"
+                            value={med.cartQty || 1}
+                            onChange={(e) =>
+                              handleQtyChange(med.id, Number(e.target.value))
+                            }
+                          >
                             {[1, 2, 3, 4, 5].map((n) => (
                               <option key={n} value={n}>Qty {n}</option>
                             ))}
                           </select>
                         ) : (
-                          <button className="btn-add-cart">Add To Cart</button>
+                          <button
+                            className="btn-add-cart"
+                            type="button"
+                            onClick={() => handleAddToCart(med.id)}
+                          >
+                            Add To Cart
+                          </button>
                         )}
                       </div>
                     </div>
@@ -143,7 +225,9 @@ function SearchPage() {
 
               {/* Cart Summary */}
               <div className="sidebar-card cart-summary-card">
-                <p className="cart-items-count">4 Items in Cart</p>
+              <p className="cart-items-count">
+                  {cartCount} Item{cartCount === 1 ? '' : 's'} in Cart
+                </p>
                 <Link to="/cart" className="btn-view-cart">
                   View Cart <i className="bi bi-chevron-right"></i>
                 </Link>

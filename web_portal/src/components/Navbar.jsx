@@ -69,7 +69,7 @@ function Navbar({ variant = 'inner', searchValue = '', onSearch, cartCount = 4 }
               <i className="bi bi-person"></i>
               <span>Hello, Log in</span>
             </Link>
-            <Link to="#" className="nav-top-action">
+            <Link to="/orders" className="nav-top-action">
               <i className="bi bi-clipboard2-pulse"></i>
               <span>Orders</span>
             </Link>

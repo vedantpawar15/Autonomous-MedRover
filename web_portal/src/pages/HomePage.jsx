@@ -1,9 +1,60 @@
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import { supabase } from '../lib/supabaseClient'
 
 function HomePage() {
   const navigate = useNavigate()
+  const [cartCount, setCartCount] = useState(0)
+
+  // Simple one-time Supabase connectivity test
+  useEffect(() => {
+    if (!supabase) return
+
+    const testSupabaseConnection = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('medicines')
+          .select('*')
+          .limit(1)
+
+        if (error) {
+          console.error('Supabase test error (but connection works):', error)
+        } else {
+          console.log('Supabase connection OK, sample data:', data)
+        }
+      } catch (err) {
+        console.error('Supabase test exception:', err)
+      }
+    }
+
+    testSupabaseConnection()
+  }, [])
+
+  // Load cart count from localStorage so navbar badge matches
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem('medrover_cart')
+      if (!raw) {
+        setCartCount(0)
+        return
+      }
+      const parsed = JSON.parse(raw)
+      if (!Array.isArray(parsed)) {
+        setCartCount(0)
+        return
+      }
+      const count = parsed.reduce(
+        (sum, item) => sum + (item.selectedQty || 1),
+        0
+      )
+      setCartCount(count)
+    } catch (e) {
+      console.error('Failed to load cart count on HomePage', e)
+      setCartCount(0)
+    }
+  }, [])
 
   const handleSearchSubmit = (e) => {
     e.preventDefault()
@@ -15,7 +66,7 @@ function HomePage() {
 
   return (
     <>
-      <Navbar variant="home" />
+      <Navbar variant="home" cartCount={cartCount} />
 
       {/* ===== HERO SECTION ===== */}
       <section className="hero-section">

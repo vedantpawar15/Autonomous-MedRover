@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import { supabase } from '../lib/supabaseClient'
 
 const rooms = [
   {
@@ -27,32 +28,119 @@ const rooms = [
   }
 ]
 
-const orderItems = [
-  { name: 'Dolo 650mg Strip (x2)', price: '₹57.84' },
-  { name: 'Dolonex DT 20mg Strip (x2)', price: '₹483.82' },
-  { name: 'Dolo 250mg Suspension (x1)', price: '₹32.10' },
-  { name: 'Leemol 650mg Strip (x1)', price: '₹16.70' }
-]
-
 function SelectRoomPage() {
   const [selectedRoom, setSelectedRoom] = useState('')
+  const [orderItems, setOrderItems] = useState([])
   const navigate = useNavigate()
+
+  // Load current cart from localStorage to show in order summary
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem('medrover_cart')
+      if (!raw) return
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) {
+        const mapped = parsed.map((item) => ({
+          medicineId: item.id,
+          name: `${item.name} (x${item.selectedQty})`,
+          unitMrp: item.originalPrice,
+          unitPrice: item.currentPrice,
+          qty: item.selectedQty
+        }))
+        setOrderItems(mapped)
+      }
+    } catch (e) {
+      console.error('Failed to load cart for order summary', e)
+    }
+  }, [])
+
+  const cartTotals = useMemo(() => {
+    return orderItems.reduce(
+      (acc, item) => {
+        acc.totalMrp += (item.unitMrp || 0) * (item.qty || 1)
+        acc.totalAmount += (item.unitPrice || 0) * (item.qty || 1)
+        return acc
+      },
+      { totalMrp: 0, totalAmount: 0 }
+    )
+  }, [orderItems])
+
+  const savings = cartTotals.totalMrp - cartTotals.totalAmount
+  const cartCount = orderItems.reduce((sum, item) => sum + (item.qty || 1), 0)
 
   const handleNavSearch = (query) => {
     navigate(`/search?query=${encodeURIComponent(query)}`)
   }
 
-  const handlePlaceOrder = () => {
+  const handlePlaceOrder = async () => {
     if (!selectedRoom) {
       alert('Please select a delivery room.')
       return
     }
-    alert(`Order placed! MedRover will deliver to Room ${selectedRoom}.`)
+
+    if (!supabase) {
+      alert('Supabase is not configured. Please check your .env.')
+      return
+    }
+
+    try {
+      const roomMeta = rooms.find((r) => r.id === selectedRoom)
+
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          room_code: selectedRoom,
+          room_label: roomMeta ? roomMeta.ward : null,
+          status: 'pending'
+        })
+        .select('*')
+        .single()
+
+      if (orderError || !order) {
+        console.error('Error creating order', orderError)
+        alert('Could not place order. Please try again.')
+        return
+      }
+
+      const itemsPayload = orderItems.map((item) => ({
+        order_id: order.id,
+        medicine_id: item.medicineId,
+        quantity: item.qty || 1,
+        unit_price: item.unitPrice || 0,
+        mrp: item.unitMrp || 0
+      }))
+
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(itemsPayload)
+
+      if (itemsError) {
+        console.error('Error creating order items', itemsError)
+        alert('Order created but items could not be saved.')
+        return
+      }
+
+      // Clear cart after successful order
+      try {
+        window.localStorage.removeItem('medrover_cart')
+      } catch (e) {
+        console.error('Failed to clear cart after order', e)
+      }
+
+      navigate('/order-success')
+    } catch (e) {
+      console.error('Exception while placing order', e)
+      alert('Unexpected error while placing order.')
+    }
   }
 
   return (
     <>
-      <Navbar variant="inner" onSearch={handleNavSearch} />
+      <Navbar
+        variant="inner"
+        onSearch={handleNavSearch}
+        cartCount={cartCount}
+      />
 
       {/* ===== SELECT DELIVERY ROOM PAGE ===== */}
       <section className="select-room-section">
@@ -136,24 +224,43 @@ function SelectRoomPage() {
               <div className="sidebar-card order-summary-card">
                 <h6 className="order-summary-title">Order Summary</h6>
 
+                {orderItems.length === 0 && (
+                  <p className="small text-muted mb-2">
+                    Your cart is empty. Go back to cart and add medicines.
+                  </p>
+                )}
+
                 {orderItems.map((item, idx) => (
                   <div className="order-summary-item" key={idx}>
                     <span className="order-summary-name">{item.name}</span>
-                    <span className="order-summary-price">{item.price}</span>
+                    <span className="order-summary-price">
+                      ₹{(item.unitPrice * item.qty).toFixed(2)}
+                    </span>
                   </div>
                 ))}
 
                 <hr className="bill-divider" />
 
-                <div className="bill-row bill-total-row">
-                  <span className="bill-label">Total Amount</span>
-                  <span className="bill-value">₹590.46</span>
+                <div className="bill-row">
+                  <span className="bill-label">Total MRP</span>
+                  <span className="bill-value">
+                    ₹{cartTotals.totalMrp.toFixed(2)}
+                  </span>
                 </div>
 
-                <div className="bill-savings">
-                  <i className="bi bi-tag-fill"></i>
-                  You save <strong>₹85.68</strong> on this order
+                <div className="bill-row bill-total-row">
+                  <span className="bill-label">Total Amount</span>
+                  <span className="bill-value">
+                    ₹{cartTotals.totalAmount.toFixed(2)}
+                  </span>
                 </div>
+
+                {savings > 0 && (
+                  <div className="bill-savings">
+                    <i className="bi bi-tag-fill"></i>
+                    You save <strong>₹{savings.toFixed(2)}</strong> on this order
+                  </div>
+                )}
               </div>
 
               {/* Delivery Info Card */}
