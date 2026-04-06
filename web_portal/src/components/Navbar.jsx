@@ -20,7 +20,7 @@ function Navbar({ variant = 'inner', searchValue = '', onSearch, cartCount = 4 }
   return (
     <>
       {/* ===== TOP BAR ===== */}
-      <div className="nav-top fixed-top">
+      <div className={`nav-top fixed-top nav-top--${variant}`}>
         <div className="container d-flex align-items-center">
 
           {/* Brand */}
@@ -47,7 +47,7 @@ function Navbar({ variant = 'inner', searchValue = '', onSearch, cartCount = 4 }
             </div>
           )}
 
-          {/* Inner variant: search bar */}
+          {/* Inner variant: search bar (Search page only) */}
           {variant === 'inner' && (
             <form className="nav-search-bar" onSubmit={handleSearchSubmit}>
               <input
@@ -56,12 +56,16 @@ function Navbar({ variant = 'inner', searchValue = '', onSearch, cartCount = 4 }
                 className="nav-search-input"
                 placeholder="Search for Medicines..."
                 defaultValue={searchValue}
+                autoComplete="off"
               />
               <button type="submit" className="nav-search-btn">
                 <i className="bi bi-search"></i>
               </button>
             </form>
           )}
+
+          {/* Plain variant: no search bar, no delivery info (Cart / Orders / Room pages) */}
+          {variant === 'plain' && <div className="nav-plain-spacer" />}
 
           {/* Right Actions */}
           <div className="nav-top-right ms-auto d-flex align-items-center">
@@ -96,7 +100,7 @@ function Navbar({ variant = 'inner', searchValue = '', onSearch, cartCount = 4 }
       {/* ===== SUB BAR ===== */}
       <div className="nav-sub">
         <div className="container">
-          <div className="collapse navbar-collapse show d-lg-flex justify-content-center" id="subNavbar">
+          <div className="collapse navbar-collapse d-lg-flex justify-content-center" id="subNavbar">
             <ul className="nav-sub-links">
               <li>
                 <Link to="/" className={location.pathname === '/' ? 'active' : ''}>

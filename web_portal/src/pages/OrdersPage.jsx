@@ -64,7 +64,7 @@ function OrdersPage() {
 
   return (
     <>
-      <Navbar variant="inner" cartCount={cartCount} />
+        <Navbar variant="plain" cartCount={cartCount} />
 
       <section className="select-room-section">
         <div className="container">

@@ -144,9 +144,7 @@ function SearchPage() {
   return (
     <>
       <Navbar
-        variant="inner"
-        searchValue={query}
-        onSearch={handleNavSearch}
+        variant="plain"
         cartCount={cartCount}
       />
 
@@ -164,9 +162,33 @@ function SearchPage() {
               <div className="col-lg-8">
               {loading && <p>Loading medicines from MedRover cloud...</p>}
               {error && <p className="text-danger small">{error}</p>}
-              {!loading && !error && filteredItems.length === 0 && (
-                <p>No medicines found for \"{query}\".</p>
+
+              {!loading && !error && filteredItems.length === 0 && query && (
+                <div className="medicine-card">
+                  <div className="medicine-img">
+                    <i className="bi bi-capsule"></i>
+                  </div>
+                  <div className="medicine-body">
+                    <div className="medicine-top-row">
+                      <div className="medicine-info">
+                        <h5 className="medicine-name">{query}</h5>
+                        <p className="medicine-brand text-muted">
+                          This medicine is currently not available in MedRover stock.
+                        </p>
+                      </div>
+                      <span className="rx-badge" title="Out of stock">
+                        <b>Out</b>
+                      </span>
+                    </div>
+                    <div className="medicine-bottom-row">
+                      <div className="medicine-price-row">
+                        <span className="price-current text-muted">Out of stock</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               )}
+
               {!loading && !error && filteredItems.map((med) => (
                 <div className="medicine-card" key={med.id}>
                   <div className="medicine-img">

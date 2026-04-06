@@ -137,8 +137,7 @@ function SelectRoomPage() {
   return (
     <>
       <Navbar
-        variant="inner"
-        onSearch={handleNavSearch}
+        variant="plain"
         cartCount={cartCount}
       />
 

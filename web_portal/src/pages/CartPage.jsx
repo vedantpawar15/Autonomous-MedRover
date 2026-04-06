@@ -71,8 +71,7 @@ function CartPage() {
   return (
     <>
       <Navbar
-        variant="inner"
-        onSearch={handleNavSearch}
+        variant="plain"
         cartCount={totalQuantity}
       />
 

@@ -88,6 +88,11 @@ body {
   flex-shrink: 0;
 }
 
+/* Spacer for plain variant — pushes right actions to far right */
+.nav-plain-spacer {
+  flex: 1;
+}
+
 /* Delivery Info */
 .nav-delivery {
   display: flex;
@@ -157,10 +162,68 @@ body {
   border: none;
   padding: 4px 8px;
   background: transparent;
+  z-index: 1100;
 }
 
 .navbar-toggler:focus {
   box-shadow: none;
+}
+
+@media (max-width: 768px) {
+  /* Let container flow normally */
+  .nav-top .container {
+    position: static;
+    padding-right: 12px;
+    flex-wrap: nowrap;
+    gap: 0;
+  }
+
+  /* Hamburger flows in the natural flex row (not absolute) */
+  .navbar-toggler {
+    position: static;
+    flex-shrink: 0;
+    padding: 4px 6px;
+    margin-left: 4px;
+  }
+
+  /* ── HOME PAGE: show all 3 icons (Login, Orders, Cart), no search bar ── */
+  .nav-top--home .nav-top-action {
+    display: flex;
+    padding: 4px 6px;
+    flex-shrink: 0;
+  }
+
+  /* ── INNER PAGES (Search page): hide all icons, only search + burger ── */
+  .nav-top--inner .nav-top-action {
+    display: none;
+  }
+  .nav-top--inner .nav-top-right {
+    display: none;
+  }
+
+  /* ── PLAIN PAGES (Cart/Orders/Room/Success): hide icons + search bar, only burger ── */
+  .nav-top--plain .nav-top-right {
+    display: none;
+  }
+  .nav-top--plain .nav-search-bar {
+    display: none;
+  }
+
+  /* Search bar fills remaining space between brand and hamburger */
+  .nav-search-bar {
+    flex: 1;
+    min-width: 0;
+    max-width: none;
+    margin: 0 6px;
+  }
+
+  /* Shrink brand slightly */
+  .brand-name {
+    font-size: 0.95rem;
+  }
+  .brand-sub {
+    font-size: 0.65rem;
+  }
 }
 
 /* ===== NAVBAR — SUB BAR (White) ===== */
@@ -292,6 +355,57 @@ body {
 
 .hero-search-input::placeholder {
   color: #b0bac5;
+}
+
+.hero-suggestions {
+  margin-top: 6px;
+  text-align: left;
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.25);
+  padding: 8px 0;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.hero-suggestions-header {
+  font-size: 0.85rem;
+  color: #64748b;
+  padding: 4px 16px 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.hero-suggestions-header span {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.hero-suggestion-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 8px 16px;
+  font-size: 0.9rem;
+  color: #333;
+  cursor: pointer;
+  border-radius: 0;
+}
+
+.hero-suggestion-item:hover {
+  background: #f9fafb;
+}
+
+.hero-suggestion-name {
+  flex: 1;
+}
+
+.hero-suggestion-icon {
+  font-size: 0.9rem;
+  color: #9ca3af;
 }
 
 .btn-hero-search {

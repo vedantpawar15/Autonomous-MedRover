@@ -7,6 +7,9 @@ import { supabase } from '../lib/supabaseClient'
 function HomePage() {
   const navigate = useNavigate()
   const [cartCount, setCartCount] = useState(0)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [suggestions, setSuggestions] = useState([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
 
   // Simple one-time Supabase connectivity test
   useEffect(() => {
@@ -58,11 +61,55 @@ function HomePage() {
 
   const handleSearchSubmit = (e) => {
     e.preventDefault()
-    const query = e.target.elements.query.value
+    const query = searchTerm
     if (query.trim()) {
+      setShowSuggestions(false)
       navigate(`/search?query=${encodeURIComponent(query)}`)
     }
   }
+
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value)
+    setShowSuggestions(true)
+  }
+
+  const handleSuggestionClick = (name) => {
+    setSearchTerm(name)
+    setShowSuggestions(false)
+    navigate(`/search?query=${encodeURIComponent(name)}`)
+  }
+
+  // Fetch medicine name suggestions as user types
+  useEffect(() => {
+    const term = searchTerm.trim()
+    if (!supabase || term.length < 2) {
+      setSuggestions([])
+      return
+    }
+
+    const timeoutId = setTimeout(async () => {
+      try {
+        const { data, error } = await supabase
+          .from('medicines')
+          .select('id, name')
+          .ilike('name', `${term}%`)
+          .order('name', { ascending: true })
+          .limit(6)
+
+        if (error) {
+          console.error('Error fetching suggestions', error)
+          setSuggestions([])
+        } else {
+          setSuggestions(data || [])
+        }
+      } catch (err) {
+        console.error('Exception fetching suggestions', err)
+        setSuggestions([])
+      }
+    }, 250) // small debounce
+
+    return () => clearTimeout(timeoutId)
+  }, [searchTerm])
 
   return (
     <>
@@ -92,12 +139,33 @@ function HomePage() {
               <i className="bi bi-search hero-search-icon"></i>
               <input
                 type="text"
-                name="query"
                 className="hero-search-input"
                 placeholder="Search for Medicines..."
+                autoComplete="off"
+                value={searchTerm}
+                onChange={handleSearchChange}
               />
               <button type="submit" className="btn-hero-search">Search</button>
             </form>
+
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="hero-suggestions">
+                <div className="hero-suggestions-header">
+                  Showing results for <span>{searchTerm}</span>
+                </div>
+                {suggestions.map((med) => (
+                  <button
+                    key={med.id}
+                    type="button"
+                    className="hero-suggestion-item"
+                    onClick={() => handleSuggestionClick(med.name)}
+                  >
+                    <span className="hero-suggestion-name">{med.name}</span>
+                    <i className="bi bi-search hero-suggestion-icon"></i>
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Or You Can Order Via */}
             <div className="or-divider">

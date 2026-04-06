@@ -5,7 +5,7 @@ import Footer from '../components/Footer'
 function OrderSuccessPage() {
   return (
     <>
-      <Navbar variant="inner" cartCount={0} />
+      <Navbar variant="plain" cartCount={0} />
 
       <section className="select-room-section">
         <div className="container">
