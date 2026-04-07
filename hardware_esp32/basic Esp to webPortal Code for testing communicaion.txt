@@ -1,0 +1,157 @@
+/*
+ * ORDER MOVE TEST
+ * Polls Supabase every 3s for a pending order.
+ * When found → runs BOTH motors forward for 3 seconds.
+ * That's it. No line follow, no IR, no state machine.
+ * Just confirms: Web Portal → ESP32 → Motors works end to end.
+ */
+
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+
+// ── Config ────────────────────────────────────────────────────
+const char* WIFI_SSID     = "Ram";
+const char* WIFI_PASSWORD = "latur@24";
+const char* SUPABASE_URL  = "https://tdkccbbqktzeojgeuaoh.supabase.co";
+const char* SUPABASE_KEY  =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+  "eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRka2NjYmJxa3R6ZW9qZ2V1YW9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMzUyODEsImV4cCI6MjA4ODkxMTI4MX0."
+  "eBjZ0U9FEIg3vwHqXr8KR8VygMQDORBcaRwVY1LsdyY";
+
+// ── Motor Pins ────────────────────────────────────────────────
+#define IN1 27
+#define IN2 26
+#define IN3 25
+#define IN4 33
+#define ENA 14
+#define ENB 12
+
+#define PWM_FREQ 1000
+#define PWM_RES  8
+#define MOTOR_SPD 150
+
+// ── Helpers ───────────────────────────────────────────────────
+void motorsForward() {
+  digitalWrite(IN1, HIGH); digitalWrite(IN2, LOW);
+  digitalWrite(IN3, HIGH); digitalWrite(IN4, LOW);
+  ledcWrite(ENA, MOTOR_SPD);
+  ledcWrite(ENB, MOTOR_SPD);
+}
+
+void motorsStop() {
+  digitalWrite(IN1, LOW); digitalWrite(IN2, LOW);
+  digitalWrite(IN3, LOW); digitalWrite(IN4, LOW);
+  ledcWrite(ENA, 0);
+  ledcWrite(ENB, 0);
+}
+
+bool markInTransit(long id) {
+  HTTPClient http;
+  String url = String(SUPABASE_URL) + "/rest/v1/orders?id=eq." + id;
+  http.begin(url);
+  http.addHeader("apikey",        SUPABASE_KEY);
+  http.addHeader("Authorization", String("Bearer ") + SUPABASE_KEY);
+  http.addHeader("Content-Type",  "application/json");
+  http.addHeader("Prefer",        "return=minimal");
+  int code = http.PATCH("{\"status\":\"in_transit\"}");
+  http.end();
+  return (code >= 200 && code < 300);
+}
+
+long fetchPendingOrder() {
+  HTTPClient http;
+  String url = String(SUPABASE_URL) +
+    "/rest/v1/orders?status=eq.pending&order=created_at.asc&limit=1";
+  http.begin(url);
+  http.addHeader("apikey",        SUPABASE_KEY);
+  http.addHeader("Authorization", String("Bearer ") + SUPABASE_KEY);
+  int code = http.GET();
+  if (code != 200) { http.end(); return -1; }
+
+  String body = http.getString();
+  http.end();
+
+  StaticJsonDocument<512> doc;
+  if (deserializeJson(doc, body) != DeserializationError::Ok) return -1;
+  if (!doc.is<JsonArray>() || doc.size() == 0) return 0;  // 0 = no orders
+
+  long id        = doc[0]["id"]        | 0;
+  const char* rc = doc[0]["room_code"] | "?";
+  Serial.printf("[poll] Order #%ld  room=%s\n", id, rc);
+  return id;
+}
+
+// ── Setup ─────────────────────────────────────────────────────
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
+
+  // Motor pins
+  pinMode(IN1,OUTPUT); pinMode(IN2,OUTPUT);
+  pinMode(IN3,OUTPUT); pinMode(IN4,OUTPUT);
+  ledcAttach(ENA, PWM_FREQ, PWM_RES);
+  ledcAttach(ENB, PWM_FREQ, PWM_RES);
+  motorsStop();
+
+  // WiFi
+  Serial.println("\n==============================");
+  Serial.println("  ORDER → MOVE TEST");
+  Serial.println("  Place an order on the portal.");
+  Serial.println("  Robot will drive forward 3s.");
+  Serial.println("==============================");
+  Serial.printf("Connecting to %s ", WIFI_SSID);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  int t = 0;
+  while (WiFi.status() != WL_CONNECTED && t < 40) {
+    delay(500); Serial.print("."); t++;
+  }
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.printf("\n[OK] WiFi connected — IP: %s\n",
+      WiFi.localIP().toString().c_str());
+  } else {
+    Serial.println("\n[FAIL] WiFi not connected — halting.");
+    while (true) delay(1000);
+  }
+  Serial.println("Polling every 3s...\n");
+}
+
+// ── Loop ──────────────────────────────────────────────────────
+void loop() {
+  delay(3000);
+
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("[WARN] WiFi dropped — reconnecting...");
+    WiFi.reconnect();
+    return;
+  }
+
+  Serial.println("[poll] Checking for pending order...");
+  long id = fetchPendingOrder();
+
+  if (id < 0) {
+    Serial.println("[poll] HTTP error — retrying next cycle.");
+    return;
+  }
+
+  if (id == 0) {
+    Serial.println("[poll] No pending orders.");
+    return;
+  }
+
+  // ── ORDER FOUND → MOVE ────────────────────────────────────
+  Serial.printf("\n*** ORDER #%ld RECEIVED ***\n", id);
+  Serial.println("Marking in_transit...");
+  if (markInTransit(id)) {
+    Serial.println("[OK] Status -> in_transit");
+  } else {
+    Serial.println("[WARN] Status update failed — moving anyway");
+  }
+
+  Serial.println(">>> MOTORS FORWARD FOR 3 SECONDS <<<");
+  motorsForward();
+  delay(3000);
+  motorsStop();
+  Serial.println(">>> MOTORS STOPPED <<<");
+  Serial.println("Test complete — place another order to test again.\n");
+}

@@ -8,21 +8,21 @@ const rooms = [
   {
     id: 'A',
     name: 'Room A',
-    ward: 'Ward A — Ground Floor',
+    ward: 'Ward A',
     type: 'General Ward',
     time: '~3 min delivery'
   },
   {
     id: 'B',
     name: 'Room B',
-    ward: 'Ward B — First Floor',
+    ward: 'Ward B',
     type: 'ICU Ward',
     time: '~5 min delivery'
   },
   {
     id: 'C',
     name: 'Room C',
-    ward: 'Ward C — Second Floor',
+    ward: 'Ward C',
     type: 'Pediatric Ward',
     time: '~7 min delivery'
   }
