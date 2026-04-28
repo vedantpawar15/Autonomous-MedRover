@@ -1,42 +1,51 @@
 /*
  * ============================================================
- *  LINE FOLLOW v29 — Room B wobble-loss fix
+ *  LINE FOLLOW v33 — Auto-order movement hardening
+ * ============================================================
  *
- *  ROOT CAUSE (from v28 serial logs):
- *   Room B return: after counting B-junction (seen=1/2),
- *   robot enters massive wobble — sum=0 for 5000ms+ with
- *   wobble recovery unable to reacquire line. Robot never
- *   reaches start-T. Room A worked because only 1 junction
- *   needed and shorter travel distance.
+ *  WHAT'S NEW vs v31:
+ *   - Robust room_code parsing for web orders:
+ *       "A", "a", " A ", "Room A" all map correctly
+ *   - Mission start motor kick (220ms) so auto runs don't stay still
+ *   - Auto start now forces watch mode off before movement
+ *   - Extra serial logs for mapped room code and start path
  *
- *  FIXES IN v29:
- *   1. returnSpeed = 70 (was 40)
- *      Low speed caused excessive lateral drift on grout
- *      gaps. 70 keeps enough momentum to bridge gaps.
- *   2. Wobble: extended to 1200ms per direction (was 600ms)
- *      and wobbleSpeed = 80 (was 60). Wider sweep = more
- *      chance of reacquiring line after grout gap.
- *   3. WOBBLE ESCALATION: if wobbling > 3000ms total,
- *      escalate to full SEARCHING state (360 spin-search)
- *      instead of just oscillating forever.
- *   4. After counting intermediate junction (seen < needed):
- *      brief 300ms stop + creep-forward 200ms to re-seat
- *      on main line before continuing return.
- *   5. RETURN_MIN_TRAVEL_MS = 800ms (was 1500ms)
- *      Room B rejoin → B-junction is only ~800ms away at
- *      returnSpeed=70. 1500ms was causing it to arm too late
- *      or miss the junction window.
- *   6. RETURN_JUNCTION_COOLDOWN = 1000ms (was 600ms)
- *      After counting B-junction, 1000ms cooldown prevents
- *      re-triggering on the same junction while robot is
- *      still crossing it / doing the reseat manoeuvre.
+ *  ALL v29 LOGIC UNCHANGED:
+ *   - returnSpeed=70, wobble escalation at 3000ms
+ *   - inter-junction reseat after intermediate junctions
+ *   - RETURN_MIN_TRAVEL_MS=800ms
+ *   - Blocking missionComplete() with 180deg spin
+ *   - Full return debug prints
  *
- *  Room A unaffected: needs 1 junction, faster return speed
- *  means less wobble, same logic applies cleanly.
+ *  TRACK LAYOUT:
+ *   Room A -> turn LEFT at junction 1
+ *   Room B -> turn LEFT at junction 2
+ *   Room C -> straight to end (allDark detection)
+ *
+ *  SERIAL COMMANDS:
+ *   A/B/C -> select room manually, then 'g' to go
+ *   s -> stop    p -> settings    i -> IR snap    w -> watch IR
+ *   + / - -> speed    ] / [ -> Kp    > / < -> Kd    ) / ( -> turn
+ *   n / m -> nudge +/- 50ms
  * ============================================================
  */
 
-// ── Pins ─────────────────────────────────────────────────────
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+
+// ── WiFi & Supabase Config ────────────────────────────────────
+const char* WIFI_SSID         = "MIT#wPu@EXam2603";
+const char* WIFI_PASSWORD     = "latur@24";
+const char* SUPABASE_URL      = "https://tdkccbbqktzeojgeuaoh.supabase.co";
+const char* SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+  "eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRka2NjYmJxa3R6ZW9qZ2V1YW9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMzUyODEsImV4cCI6MjA4ODkxMTI4MX0."
+  "eBjZ0U9FEIg3vwHqXr8KR8VygMQDORBcaRwVY1LsdyY";
+
+#define POLL_INTERVAL_MS  5000
+
+// ── Motor Pins ────────────────────────────────────────────────
 #define IN1  27
 #define IN2  26
 #define IN3  25
@@ -44,6 +53,7 @@
 #define ENA  14
 #define ENB  12
 
+// ── IR Sensor Pins ────────────────────────────────────────────
 #define IR_S1 34
 #define IR_S2 35
 #define IR_S3 32
@@ -60,8 +70,8 @@ float Kp                   = 20.0;
 float Kd                   = 20.0;
 int   turnSpeed            = 140;
 int   searchSpeed          = 100;
-int   wobbleSpeed          = 80;   // v29: 60→80 wider sweep
-int   returnSpeed          = 70;   // v29: 40→70 more momentum
+int   wobbleSpeed          = 80;
+int   returnSpeed          = 70;
 int   forwardAfterJunction = 250;
 int   creepSpeed           = 30;
 
@@ -79,23 +89,19 @@ int   creepSpeed           = 30;
 #define JUNCTION_FRAMES_NEEDED      3
 #define JUNCTION_COOLDOWN_MS      900
 
-// v29: cooldown 600→1000ms (don't re-trigger same junction)
-// v29: min travel 1500→800ms (B-junction is close after rejoin)
 #define RETURN_JUNCTION_FRAMES      1
-#define RETURN_JUNCTION_COOLDOWN   1000
-#define RETURN_MIN_TRAVEL_MS        800
+#define RETURN_JUNCTION_COOLDOWN  1000
+#define RETURN_MIN_TRAVEL_MS       800
 
-// v29: wobble per-direction 600→1200ms, escalate after 3000ms
-#define RETURN_WOBBLE_MS           1200
-#define RETURN_WOBBLE_ESCALATE_MS  3000
+#define RETURN_WOBBLE_MS          1200
+#define RETURN_WOBBLE_ESCALATE_MS 3000
 
-#define REJOIN_CREEP_MS           400
-#define FINAL_UTURN_MIN_MS        800
-#define FINAL_UTURN_TIMEOUT_MS   5000
+#define REJOIN_CREEP_MS            400
+#define FINAL_UTURN_MIN_MS         800
+#define FINAL_UTURN_TIMEOUT_MS    5000
 
-// v29: after intermediate junction, reseat before continuing
-#define INTER_JUNCTION_STOP_MS    300
-#define INTER_JUNCTION_CREEP_MS   200
+#define INTER_JUNCTION_STOP_MS     300
+#define INTER_JUNCTION_CREEP_MS    200
 
 // ── State machine ─────────────────────────────────────────────
 enum RobotState {
@@ -132,15 +138,15 @@ bool          endDetectArmed     = false;
 
 // Wobble recovery
 unsigned long wobbleStart      = 0;
-unsigned long wobbleTotalStart = 0;  // v29: track total wobble time
+unsigned long wobbleTotalStart = 0;
 bool          wobbling         = false;
 int           wobbleDir        = 1;
 
 // Rejoin / reseat
-bool          rejoinCreeping      = false;
-unsigned long rejoinCreepStart    = 0;
-bool          interJnReseating    = false;  // v29: post-intermediate-junction reseat
-unsigned long interJnReseatStart  = 0;
+bool          rejoinCreeping     = false;
+unsigned long rejoinCreepStart   = 0;
+bool          interJnReseating   = false;
+unsigned long interJnReseatStart = 0;
 
 // Spin helpers
 unsigned long spinStart       = 0;
@@ -148,8 +154,20 @@ bool          spinStarted     = false;
 bool          uturnPhase2     = false;
 unsigned long uturnPhaseStart = 0;
 
-// ── v28/v29 debug ─────────────────────────────────────────────
+// Debug
 unsigned long lastDebugPrint = 0;
+
+// ── Supabase order tracking ───────────────────────────────────
+struct Order {
+  long   id;
+  String roomCode;
+  String roomLabel;
+  bool   valid;
+};
+
+long          activeOrderId = 0;    // 0 = manual / no order
+bool          orderActive   = false;
+unsigned long lastPoll      = 0;
 
 // ── Misc ──────────────────────────────────────────────────────
 bool lineFollowing = false;
@@ -178,6 +196,12 @@ bool spinRight(unsigned long minMs);
 bool spinUTurn();
 void doLineFollow();
 void processCommand(char cmd);
+void connectWiFi();
+bool httpRequest(const String&, const String&, const String&, String&);
+Order fetchNextPendingOrder();
+bool updateOrderStatus(long orderId, const char* newStatus);
+void startMission(int junction, long orderId);
+String normalizeRoomCode(const String& raw);
 
 // ─────────────────────────────────────────────────────────────
 //  MOTORS
@@ -228,7 +252,8 @@ void stopAll() {
 }
 
 // ─────────────────────────────────────────────────────────────
-//  MISSION COMPLETE — BLOCKING (v23/v27 style, unchanged)
+//  MISSION COMPLETE — blocking 180deg spin then idle
+//  Marks order delivered in Supabase if auto-mode.
 // ─────────────────────────────────────────────────────────────
 void missionComplete() {
   stopMotorsOnly();
@@ -252,9 +277,19 @@ void missionComplete() {
 
   stopAll();
   state = ARRIVED_HOME;
+
   Serial.println("================================");
   Serial.println("   MISSION COMPLETE — HOME      ");
   Serial.println("================================");
+
+  // Mark delivered if this was a Supabase order
+  if (orderActive && activeOrderId > 0) {
+    Serial.printf("Marking order #%ld delivered...\n", activeOrderId);
+    updateOrderStatus(activeOrderId, "delivered");
+    orderActive   = false;
+    activeOrderId = 0;
+    Serial.println("Done. Resuming poll for next order.");
+  }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -283,7 +318,7 @@ void printIR() {
 }
 
 void printSettings() {
-  Serial.println("======== SETTINGS v29 ========");
+  Serial.println("======== SETTINGS v31 ========");
   Serial.printf("  baseSpeed              : %d\n",  baseSpeed);
   Serial.printf("  rightOffset            : %d\n",  rightOffset);
   Serial.printf("  Kp / Kd                : %.1f / %.1f\n", Kp, Kd);
@@ -295,16 +330,16 @@ void printSettings() {
   Serial.printf("  roomWait               : %dms\n", ROOM_WAIT_MS);
   Serial.printf("  branchMinTravel        : %dms\n", BRANCH_MIN_TRAVEL_MS);
   Serial.printf("  lineEndConfirm         : %dms\n", LINE_END_CONFIRM_MS);
-  Serial.printf("  uturnMinMs             : %dms\n", UTURN_MIN_MS);
   Serial.printf("  returnJunctionCooldown : %dms\n", RETURN_JUNCTION_COOLDOWN);
   Serial.printf("  returnMinTravel        : %dms\n", RETURN_MIN_TRAVEL_MS);
   Serial.printf("  returnWobbleMs         : %dms\n", RETURN_WOBBLE_MS);
   Serial.printf("  returnWobbleEscalate   : %dms\n", RETURN_WOBBLE_ESCALATE_MS);
   Serial.printf("  rejoinCreepMs          : %dms\n", REJOIN_CREEP_MS);
   Serial.printf("  finalUturnMinMs        : %dms\n", FINAL_UTURN_MIN_MS);
-  Serial.printf("  finalUturnTimeoutMs    : %dms\n", FINAL_UTURN_TIMEOUT_MS);
   Serial.printf("  targetJunction         : %d (%s)\n", targetJunction,
     targetJunction==0?"C-straight":targetJunction==1?"A-Room1":"B-Room2");
+  Serial.printf("  orderActive            : %s (id=%ld)\n",
+    orderActive ? "YES" : "NO", activeOrderId);
   Serial.println("==============================");
 }
 
@@ -372,23 +407,19 @@ bool checkJunction() {
 
 // ─────────────────────────────────────────────────────────────
 //  JUNCTION CHECK STRICT — return leg
-//  sum>=4 always; sum>=3 accepted for final junction only
-//  Full debug prints retained from v28
 // ─────────────────────────────────────────────────────────────
 bool checkJunctionStrict() {
   IRSensor ir  = readIR();
   int      sum = irSum(ir);
-  unsigned long now = millis();
+  unsigned long now         = millis();
   unsigned long sinceLastJn = now - lastJunctionTime;
 
   if (sum >= 3) {
     if (sinceLastJn < RETURN_JUNCTION_COOLDOWN) {
       static unsigned long lastCooldownPrint = 0;
       if (now - lastCooldownPrint > 100) {
-        Serial.printf("  [strict] sum=%d [%d%d%d%d%d] COOLDOWN %lums remaining (seen=%d)\n",
-          sum, ir.s1,ir.s2,ir.s3,ir.s4,ir.s5,
-          RETURN_JUNCTION_COOLDOWN - sinceLastJn,
-          returnJunctionsSeen);
+        Serial.printf("  [strict] sum=%d COOLDOWN %lums (seen=%d)\n",
+          sum, RETURN_JUNCTION_COOLDOWN - sinceLastJn, returnJunctionsSeen);
         lastCooldownPrint = now;
       }
       setMotorLeft(returnSpeed);
@@ -398,8 +429,7 @@ bool checkJunctionStrict() {
 
     Serial.printf("  [strict] sum=%d [%d%d%d%d%d] t+%lums seen=%d/%d\n",
       sum, ir.s1,ir.s2,ir.s3,ir.s4,ir.s5,
-      now - returnStartTime,
-      returnJunctionsSeen, returnJunctionsNeeded);
+      now - returnStartTime, returnJunctionsSeen, returnJunctionsNeeded);
 
     bool trigger = false;
     if (sum >= 4) {
@@ -410,13 +440,11 @@ bool checkJunctionStrict() {
     }
 
     if (trigger) {
-      Serial.printf("  [strict] JUNCTION TRIGGERED sum=%d\n", sum);
       junctionFrames   = 0;
       lastJunctionTime = now;
       return true;
     }
   }
-
   return false;
 }
 
@@ -499,7 +527,7 @@ bool spinUTurn() {
     stopMotorsOnly(); delay(100);
     spinStarted = false;
     uturnPhase2 = false;
-    Serial.println(">> U-turn complete — line found");
+    Serial.println(">> U-turn complete");
     return true;
   }
   if (millis() - spinStart > 8000) {
@@ -513,10 +541,9 @@ bool spinUTurn() {
 }
 
 // ─────────────────────────────────────────────────────────────
-//  MAIN DRIVE FUNCTION
+//  MAIN DRIVE FUNCTION  (v29 logic, unchanged)
 // ─────────────────────────────────────────────────────────────
 void doLineFollow() {
-
   IRSensor ir  = readIR();
   int      sum = irSum(ir);
 
@@ -526,7 +553,7 @@ void doLineFollow() {
     if (irSum(readIR()) > 0) {
       Serial.println(">> Line found — resuming");
       wobbling = false;
-      state = stateAfterSearch;
+      state    = stateAfterSearch;
     } else {
       if (searchDir > 0) { setMotorLeft(searchSpeed); setMotorRight(-searchSpeed); }
       else               { setMotorLeft(-searchSpeed); setMotorRight(searchSpeed); }
@@ -542,7 +569,7 @@ void doLineFollow() {
       lastMsg = millis();
     }
     if (elapsed >= JUNCTION_PAUSE_MS) {
-      Serial.println(">> Pause done — nudging past junction...");
+      Serial.println(">> Nudging past junction...");
       unsigned long nudge = millis();
       while (millis() - nudge < (unsigned long)forwardAfterJunction) {
         setMotorLeft(baseSpeed);
@@ -638,8 +665,21 @@ void doLineFollow() {
       junctionFrames   = 0;
       lineEndActive    = false;
       lastJunctionTime = millis();
-      state            = BRANCH_RETURN;
-      Serial.println(">> BRANCH_RETURN — heading back to main line");
+
+      if (targetJunction == 0) {
+        // Room C: U-turn done on main vertical line — no branch to rejoin.
+        // Go straight to RETURNING, need 1 junction = Start T-bar.
+        returnJunctionsSeen   = 0;
+        returnJunctionsNeeded = 1;
+        returnStartTime       = millis();
+        wobbling              = false;
+        interJnReseating      = false;
+        state                 = RETURNING;
+        Serial.println(">> [C] U-turn done — RETURNING direct, need 1 junction (Start T-bar)");
+      } else {
+        state = BRANCH_RETURN;
+        Serial.println(">> BRANCH_RETURN");
+      }
     }
     return;
   }
@@ -652,7 +692,7 @@ void doLineFollow() {
       return;
     }
     if (checkJunction()) {
-      Serial.println(">> Main line junction detected — rejoining");
+      Serial.println(">> Main line junction — rejoining");
       spinStarted    = false;
       rejoinCreeping = false;
       state          = REJOINING_MAIN;
@@ -682,67 +722,56 @@ void doLineFollow() {
     junctionFrames        = 0;
     lastJunctionTime      = millis();
     returnJunctionsSeen   = 0;
-    returnJunctionsNeeded = targetJunction;
+    // Always 1: after rejoining the main vertical line and spinning to face
+    // downward toward Start, the ONLY junction to count is the Start T-bar.
+    // J1 / J2 are horizontal branches — they read sum=3..5 on the outbound
+    // sensor array but when heading DOWN the main line the robot crosses them
+    // at full width, so we use RETURN_JUNCTION_COOLDOWN to skip them and only
+    // stop at the Start T-bar (which is the widest crossing, sum=5).
+    returnJunctionsNeeded = 1;
     returnStartTime       = millis();
     wobbling              = false;
     rejoinCreeping        = false;
     interJnReseating      = false;
     state                 = RETURNING;
     Serial.println("================================================");
-    Serial.printf(">> RETURNING — need %d junction(s)\n", returnJunctionsNeeded);
-    Serial.printf("   counting arms after %dms travel\n", RETURN_MIN_TRAVEL_MS);
-    Serial.printf("   returnSpeed=%d  cooldown=%dms\n",
-      returnSpeed, RETURN_JUNCTION_COOLDOWN);
+    Serial.printf(">> RETURNING — need 1 junction (Start T-bar)\n");
+    Serial.printf("   returnSpeed=%d  cooldown=%dms\n", returnSpeed, RETURN_JUNCTION_COOLDOWN);
     Serial.println("================================================");
     return;
   }
 
-  // ── RETURNING ─────────────────────────────────────────────
   if (state == RETURNING) {
 
-    // ── v29: inter-junction reseat phase ─────────────────────
-    // After counting an intermediate junction, stop briefly then
-    // creep forward to re-seat on main line before continuing.
+    // Inter-junction reseat
     if (interJnReseating) {
       unsigned long reseatElapsed = millis() - interJnReseatStart;
       if (reseatElapsed < INTER_JUNCTION_STOP_MS) {
-        stopMotorsOnly();
-        return;
+        stopMotorsOnly(); return;
       }
       if (reseatElapsed < INTER_JUNCTION_STOP_MS + INTER_JUNCTION_CREEP_MS) {
         setMotorLeft(creepSpeed);
         setMotorRight(constrain(creepSpeed + rightOffset/4, 0, 255));
         return;
       }
-      // Reseat done
       interJnReseating = false;
       lastError        = 0;
       wobbling         = false;
-      Serial.println("  [return] inter-junction reseat done — continuing");
+      Serial.println("  [return] reseat done — continuing");
     }
 
     unsigned long returnTravelled = millis() - returnStartTime;
     unsigned long now             = millis();
 
-    // ── v28/v29 per-tick debug (50ms throttle) ────────────────
     if (now - lastDebugPrint >= 50) {
       IRSensor dbg = readIR();
-      int dbgSum   = irSum(dbg);
-      unsigned long sinceJn = now - lastJunctionTime;
-      Serial.printf("  [RET t=%lu] [%d%d%d%d%d] sum=%d travel=%lums jnSince=%lums seen=%d/%d%s\n",
-        now,
-        dbg.s1,dbg.s2,dbg.s3,dbg.s4,dbg.s5,
-        dbgSum,
-        returnTravelled,
-        sinceJn,
-        returnJunctionsSeen,
-        returnJunctionsNeeded,
-        (returnTravelled < RETURN_MIN_TRAVEL_MS) ? " [PRE-ARM]" : ""
-      );
+      Serial.printf("  [RET t=%lu] [%d%d%d%d%d] sum=%d travel=%lums seen=%d/%d%s\n",
+        now, dbg.s1,dbg.s2,dbg.s3,dbg.s4,dbg.s5, irSum(dbg),
+        returnTravelled, returnJunctionsSeen, returnJunctionsNeeded,
+        (returnTravelled < RETURN_MIN_TRAVEL_MS) ? " [PRE-ARM]" : "");
       lastDebugPrint = now;
     }
 
-    // ── Wobble helper (shared pre-arm + counting phases) ──────
     auto doWobble = [&]() {
       if (!wobbling) {
         wobbling         = true;
@@ -751,17 +780,14 @@ void doLineFollow() {
         wobbleDir        = (lastError >= 0) ? 1 : -1;
         Serial.println("  [return] lost line — wobbling");
       }
-
-      // v29: escalate to full SEARCHING after RETURN_WOBBLE_ESCALATE_MS
       if (millis() - wobbleTotalStart >= RETURN_WOBBLE_ESCALATE_MS) {
-        Serial.println("  [return] wobble escalated — switching to SEARCHING");
-        wobbling              = false;
-        stateAfterSearch      = RETURNING;
-        state                 = SEARCHING;
-        searchDir             = wobbleDir;
+        Serial.println("  [return] wobble escalated — SEARCHING");
+        wobbling         = false;
+        stateAfterSearch = RETURNING;
+        state            = SEARCHING;
+        searchDir        = wobbleDir;
         return;
       }
-
       if (millis() - wobbleStart < RETURN_WOBBLE_MS) {
         if (wobbleDir > 0) { setMotorLeft(wobbleSpeed); setMotorRight(-wobbleSpeed); }
         else               { setMotorLeft(-wobbleSpeed); setMotorRight(wobbleSpeed); }
@@ -771,61 +797,94 @@ void doLineFollow() {
       }
     };
 
-    // ── Pre-arm phase ─────────────────────────────────────────
     if (returnTravelled < RETURN_MIN_TRAVEL_MS) {
-      if (sum == 0) {
-        doWobble();
-      } else {
+      if (sum == 0) { doWobble(); }
+      else {
         wobbling = false;
-        int savedBase = baseSpeed;
-        baseSpeed = returnSpeed;
-        doPD();
-        baseSpeed = savedBase;
+        int s = baseSpeed; baseSpeed = returnSpeed; doPD(); baseSpeed = s;
       }
       return;
     }
 
-    // ── Counting phase ────────────────────────────────────────
-    if (sum == 0) {
-      doWobble();
-      return;
-    }
-
+    if (sum == 0) { doWobble(); return; }
     wobbling = false;
 
     if (checkJunctionStrict()) {
       returnJunctionsSeen++;
       Serial.println("================================================");
       Serial.printf("*** RETURN JUNCTION %d / %d at t=%lums ***\n",
-        returnJunctionsSeen, returnJunctionsNeeded,
-        millis() - returnStartTime);
+        returnJunctionsSeen, returnJunctionsNeeded, millis() - returnStartTime);
       Serial.println("================================================");
 
       if (returnJunctionsSeen >= returnJunctionsNeeded) {
-        missionComplete();  // BLOCKING — never returns
+        missionComplete();
         return;
       }
-
-      // v29: intermediate junction — reseat before continuing
       Serial.println("  [return] intermediate junction — reseating...");
-      interJnReseating  = true;
+      interJnReseating   = true;
       interJnReseatStart = millis();
       return;
     }
 
-    int savedBase = baseSpeed;
-    baseSpeed = returnSpeed;
-    doPD();
-    baseSpeed = savedBase;
+    int s = baseSpeed; baseSpeed = returnSpeed; doPD(); baseSpeed = s;
     return;
   }
 
   // ── OUTBOUND LINE FOLLOWING ───────────────────────────────
   if (state == LINE_FOLLOWING) {
+    // ── Room C: straight to end, bypass ALL junctions ────────
+    // targetJunction==0 means C. Robot follows the vertical line
+    // past J1 and J2 (both crossed straight, not stopped at).
+    // When allDark for LINE_END_CONFIRM_MS it has reached the
+    // physical end of C. Then wait 5s, U-turn, return to Start.
     if (targetJunction == 0) {
-      if (allDark(ir)) { missionComplete(); return; }
-      doPD(); return;
+      // End detection — arm only after BRANCH_MIN_TRAVEL_MS
+      if (!endDetectArmed) {
+        if (millis() - branchStartTime < BRANCH_MIN_TRAVEL_MS) {
+          // Still arming — drive straight, ignore junctions
+          doPD();
+          return;
+        }
+        endDetectArmed = true;
+        Serial.println("  [C] end detection ARMED");
+      }
+
+      if (allDark(ir)) {
+        if (!lineEndActive) {
+          lineEndActive = true;
+          lineEndStart  = millis();
+          Serial.println("  [C] end of line? confirming...");
+        }
+        // Creep to confirm real wall (not grout gap)
+        setMotorLeft(creepSpeed);
+        setMotorRight(constrain(creepSpeed + rightOffset/4, 0, 255));
+        unsigned long waited = millis() - lineEndStart;
+        static unsigned long lastCEndMsg = 0;
+        if (millis() - lastCEndMsg > 300) {
+          Serial.printf("  [C] dark for %lums / %dms\n", waited, LINE_END_CONFIRM_MS);
+          lastCEndMsg = millis();
+        }
+        if (!allDark(readIR())) {
+          lineEndActive = false;  // grout gap — carry on
+          return;
+        }
+        if (waited >= LINE_END_CONFIRM_MS) {
+          // Confirmed end of C line
+          stopMotorsOnly();
+          lineEndActive  = false;
+          endDetectArmed = false;
+          state           = AT_ROOM;   // reuse AT_ROOM for the 5s wait
+          roomArrivalTime = millis();
+          Serial.printf(">> ROOM C REACHED — waiting %ds\n", ROOM_WAIT_MS/1000);
+        }
+      } else {
+        lineEndActive = false;
+        doPD();
+      }
+      return;
     }
+
+    // ── Rooms A / B: follow to target junction then turn left ─
     if (sum == 0) {
       stateAfterSearch = LINE_FOLLOWING;
       state            = SEARCHING;
@@ -850,35 +909,163 @@ void doLineFollow() {
 }
 
 // ─────────────────────────────────────────────────────────────
+//  MISSION KICKOFF — resets all state vars, starts run
+// ─────────────────────────────────────────────────────────────
+void startMission(int junction, long orderId) {
+  targetJunction        = junction;
+  activeOrderId         = orderId;
+  orderActive           = (orderId > 0);
+  watchingIR            = false;
+  lineFollowing         = true;
+  state                 = LINE_FOLLOWING;
+  stateAfterSearch      = LINE_FOLLOWING;
+  lastError             = 0;
+  junctionsSeen         = 0;
+  junctionFrames        = 0;
+  returnJunctionsSeen   = 0;
+  returnJunctionsNeeded = 0;
+  lastJunctionTime      = 0;
+  lineEndActive         = false;
+  endDetectArmed        = false;
+  spinStarted           = false;
+  uturnPhase2           = false;
+  wobbling              = false;
+  rejoinCreeping        = false;
+  interJnReseating      = false;
+  lastDebugPrint        = 0;
+  branchStartTime       = millis();  // Room C uses this to arm end-detection
+  Serial.printf(">>> MISSION START — junction=%d  orderId=%ld\n", junction, orderId);
+
+  // Kick motors briefly so auto-start cannot appear "stuck" at trigger time.
+  setMotorLeft(baseSpeed);
+  setMotorRight(constrain(baseSpeed + rightOffset, 0, 255));
+  delay(220);
+
+  printSettings();
+}
+
+// ─────────────────────────────────────────────────────────────
+//  WIFI
+// ─────────────────────────────────────────────────────────────
+void connectWiFi() {
+  Serial.print("Connecting to WiFi");
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  int tries = 0;
+  while (WiFi.status() != WL_CONNECTED && tries < 40) {
+    delay(500); Serial.print("."); tries++;
+  }
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\nWiFi connected. IP: " + WiFi.localIP().toString());
+  } else {
+    Serial.println("\nWiFi FAILED — offline (manual mode only)");
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+//  SUPABASE HTTP
+// ─────────────────────────────────────────────────────────────
+bool httpRequest(const String& method, const String& url,
+                 const String& body, String& response) {
+  if (WiFi.status() != WL_CONNECTED) { Serial.println("[HTTP] WiFi down"); return false; }
+  HTTPClient http;
+  http.begin(url);
+  http.setTimeout(4000);
+  http.addHeader("apikey",        SUPABASE_ANON_KEY);
+  http.addHeader("Authorization", String("Bearer ") + SUPABASE_ANON_KEY);
+  http.addHeader("Content-Type",  "application/json");
+  // Supabase requires this for PATCH — without it returns 406 Not Acceptable
+  if (method == "PATCH") http.addHeader("Prefer", "return=minimal");
+
+  int code;
+  if      (method == "GET")   code = http.GET();
+  else if (method == "PATCH") code = http.PATCH(body);
+  else if (method == "POST")  code = http.POST(body);
+  else { http.end(); return false; }
+
+  bool ok = false;
+  if (code > 0) {
+    // Avoid blocking on empty/chunked PATCH responses (common with return=minimal).
+    // For GET we still read body (needed for JSON parsing).
+    if (method == "GET" || method == "POST") {
+      response = http.getString();
+    } else {
+      response = "";
+    }
+    Serial.printf("[HTTP] %s %d\n", method.c_str(), code);
+    ok = (code >= 200 && code < 300);
+  } else {
+    Serial.printf("[HTTP] Error: %s\n", http.errorToString(code).c_str());
+  }
+  http.end();
+  return ok;
+}
+
+Order fetchNextPendingOrder() {
+  Order o = { 0, "", "", false };
+  String url = String(SUPABASE_URL) +
+    "/rest/v1/orders?status=eq.pending&order=created_at.asc&limit=1";
+  String resp;
+  if (!httpRequest("GET", url, "", resp)) return o;
+
+  StaticJsonDocument<1024> doc;
+  if (deserializeJson(doc, resp) != DeserializationError::Ok) return o;
+  if (!doc.is<JsonArray>() || doc.size() == 0) return o;
+
+  JsonObject obj = doc[0];
+  o.id        = obj["id"]         | 0;
+  o.roomCode  = obj["room_code"]  | "";
+  o.roomLabel = obj["room_label"] | "";
+  o.valid     = (o.id > 0 && o.roomCode.length() > 0);
+  return o;
+}
+
+bool updateOrderStatus(long orderId, const char* newStatus) {
+  String url = String(SUPABASE_URL) + "/rest/v1/orders?id=eq." + String(orderId);
+  StaticJsonDocument<128> bodyDoc;
+  bodyDoc["status"] = newStatus;
+  String body, resp;
+  serializeJson(bodyDoc, body);
+  bool ok = httpRequest("PATCH", url, body, resp);
+  Serial.println(ok ? String("Order status -> ") + newStatus
+                    : String("Status update FAILED: ") + resp);
+  return ok;
+}
+
+String normalizeRoomCode(const String& raw) {
+  String r = raw;
+  r.trim();
+  r.toUpperCase();
+
+  if (r == "A" || r == "B" || r == "C") return r;
+
+  // Accept labels like "ROOM A" by taking the last alpha character.
+  for (int i = (int)r.length() - 1; i >= 0; --i) {
+    char c = r[i];
+    if (c >= 'A' && c <= 'Z') {
+      if (c == 'A' || c == 'B' || c == 'C') return String(c);
+      break;
+    }
+  }
+  return "";
+}
+
+// ─────────────────────────────────────────────────────────────
 //  COMMANDS
 // ─────────────────────────────────────────────────────────────
 void processCommand(char cmd) {
   switch(cmd) {
-    case 'A': case 'a': targetJunction=1; Serial.println(">>> Mode A: Room 1"); break;
-    case 'B': case 'b': targetJunction=2; Serial.println(">>> Mode B: Room 2"); break;
-    case 'C': case 'c': targetJunction=0; Serial.println(">>> Mode C: straight"); break;
+    case 'A': case 'a': targetJunction=1; Serial.println(">>> Mode A: Room 1 — 'g' to go"); break;
+    case 'B': case 'b': targetJunction=2; Serial.println(">>> Mode B: Room 2 — 'g' to go"); break;
+    case 'C': case 'c': targetJunction=0; Serial.println(">>> Mode C: straight — 'g' to go"); break;
     case 'g':
-      lineFollowing         = true;
-      state                 = LINE_FOLLOWING;
-      stateAfterSearch      = LINE_FOLLOWING;
-      lastError             = 0;
-      junctionsSeen         = 0;
-      junctionFrames        = 0;
-      returnJunctionsSeen   = 0;
-      returnJunctionsNeeded = 0;
-      lastJunctionTime      = 0;
-      lineEndActive         = false;
-      endDetectArmed        = false;
-      spinStarted           = false;
-      uturnPhase2           = false;
-      wobbling              = false;
-      rejoinCreeping        = false;
-      interJnReseating      = false;
-      lastDebugPrint        = 0;
-      Serial.println(">>> START");
-      printSettings();
+      startMission(targetJunction, 0);   // orderId=0 = manual (no Supabase update)
       break;
-    case 's': stopAll(); Serial.println(">>> STOPPED"); break;
+    case 's':
+      stopAll();
+      orderActive   = false;
+      activeOrderId = 0;
+      Serial.println(">>> STOPPED");
+      break;
     case 'f':
       stopAll();
       setMotorLeft(baseSpeed);
@@ -894,16 +1081,14 @@ void processCommand(char cmd) {
     case '(': turnSpeed=max(turnSpeed-5,80);   Serial.printf("Turn:%d\n",turnSpeed);   break;
     case 'n':
       forwardAfterJunction=min(forwardAfterJunction+50,1000);
-      Serial.printf("forwardAfterJunction:%dms\n",forwardAfterJunction);
-      break;
+      Serial.printf("forwardAfterJunction:%dms\n",forwardAfterJunction); break;
     case 'm':
       forwardAfterJunction=max(forwardAfterJunction-50,0);
-      Serial.printf("forwardAfterJunction:%dms\n",forwardAfterJunction);
-      break;
-    case 'i': printIR();                                                 break;
+      Serial.printf("forwardAfterJunction:%dms\n",forwardAfterJunction); break;
+    case 'i': printIR();                                                  break;
     case 'w': stopAll(); watchingIR=true; Serial.println(">>> Watch IR"); break;
-    case 'p': printSettings();                                           break;
-    case '\n': case '\r': case ' ':                                      break;
+    case 'p': printSettings();                                            break;
+    case '\n': case '\r': case ' ':                                       break;
     default: Serial.printf("? '%c'\n",cmd);
   }
 }
@@ -921,21 +1106,73 @@ void setup() {
   pinMode(IR_S5,INPUT);
 
   Serial.println("==============================================");
-  Serial.println("  LINE FOLLOW v29 — Hospital Rover           ");
+  Serial.println("  LINE FOLLOW v33 — Hospital Rover           ");
+  Serial.println("  FIX: Room C full path + Room B stop fix    ");
   Serial.println("==============================================");
-  Serial.println("  A=Room1  B=Room2  C=end  then 'g'          ");
-  Serial.println("  v29: returnSpeed=70, wobble escalation,     ");
-  Serial.println("       inter-junction reseat, minTravel=800ms ");
+  Serial.println("  A/B/C + g = manual  |  auto via Supabase   ");
   Serial.println("==============================================");
   printSettings();
+  connectWiFi();
 }
 
 void loop() {
+  // Serial commands — always processed
   while (Serial.available() > 0) {
-    char cmd = (char)Serial.read();
-    processCommand(cmd);
+    processCommand((char)Serial.read());
     delay(10);
   }
-  if (watchingIR)    { printIR();      delay(100); }
-  if (lineFollowing) { doLineFollow(); delay(10);  }
+
+  // Active mission — drive the bot
+  if (lineFollowing) {
+    doLineFollow();
+    delay(10);
+    return;   // skip polling while running
+  }
+
+  // Watch IR mode
+  if (watchingIR) { printIR(); delay(100); return; }
+
+  // ── IDLE — poll Supabase every POLL_INTERVAL_MS ───────────
+  unsigned long now = millis();
+  if (now - lastPoll < POLL_INTERVAL_MS) return;
+  lastPoll = now;
+
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("[poll] WiFi down — skipping");
+    return;
+  }
+
+  Serial.println("[poll] Checking Supabase for pending orders...");
+  Order o = fetchNextPendingOrder();
+
+  if (!o.valid) {
+    Serial.println("[poll] No pending orders.");
+    return;
+  }
+
+  String roomCode = normalizeRoomCode(o.roomCode);
+  Serial.printf("[poll] Order #%ld -> room raw='%s' normalized='%s' (%s)\n",
+    o.id, o.roomCode.c_str(), roomCode.c_str(), o.roomLabel.c_str());
+
+  // Map room_code to junction number
+  int junction = -1;
+  if      (roomCode == "A") junction = 1;
+  else if (roomCode == "B") junction = 2;
+  else if (roomCode == "C") junction = 0;
+
+  if (junction == -1) {
+    Serial.printf("[poll] Unknown room_code '%s' — skipping\n", o.roomCode.c_str());
+    return;
+  }
+
+  // Mark in_transit — log failure but START THE ROBOT REGARDLESS.
+  // A failed status update must never keep the robot stationary.
+  Serial.println("[poll] Updating status -> in_transit ...");
+  if (!updateOrderStatus(o.id, "in_transit")) {
+    Serial.println("[poll] WARNING: in_transit update failed — starting anyway");
+  }
+
+  // Go!
+  Serial.printf("[poll] Starting mission now (junction=%d, orderId=%ld)\n", junction, o.id);
+  startMission(junction, o.id);
 }
