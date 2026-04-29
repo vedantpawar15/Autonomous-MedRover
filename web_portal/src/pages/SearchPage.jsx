@@ -3,18 +3,19 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { supabase } from '../lib/supabaseClient'
+import {
+  mergeSearchItemsIntoStoredCart,
+  persistCartLines,
+  cartTotalQty
+} from '../lib/cartStorage'
 
 const formatMedicine = (row) => ({
   id: row.id,
   name: row.name,
   brand: row.brand,
   qty: row.pack_info,
-  price: Number(row.selling_price),
-  original: Number(row.mrp),
-  discount:
-    row.mrp && row.mrp > 0
-      ? `${Math.round(((row.mrp - row.selling_price) / row.mrp) * 100)}% OFF`
-      : '',
+  image: row.image_url || '',
+  price: Number(row.mrp) || 0,
   rx: !!row.requires_rx,
   inCart: false,
   cartQty: 1
@@ -84,25 +85,20 @@ function SearchPage() {
     fetchMedicines()
   }, [query])
 
-  // Persist cart to localStorage so CartPage can read it
+  // Merge visible cart rows into full cart so switching searches does not drop items
   useEffect(() => {
-    const cartPayload = items
-      .filter((med) => med.inCart)
-      .map((med) => ({
-        id: med.id,
-        name: med.name,
-        qtyInfo: med.qty,
-        originalPrice: med.original,
-        currentPrice: med.price,
-        selectedQty: med.cartQty || 1
-      }))
-
     try {
-      window.localStorage.setItem('medrover_cart', JSON.stringify(cartPayload))
+      const merged = mergeSearchItemsIntoStoredCart(items)
+      persistCartLines(merged)
     } catch (e) {
-      console.error('Failed to persist cart to localStorage', e)
+      console.error('Failed to persist merged cart', e)
     }
   }, [items])
+
+  const mergedCartLines = useMemo(
+    () => mergeSearchItemsIntoStoredCart(items),
+    [items]
+  )
 
   const filteredItems = useMemo(
     () =>
@@ -112,12 +108,7 @@ function SearchPage() {
     [items, query]
   )
 
-  // Cart count should reflect all items in cart, not just current filter
-  const cartItems = items.filter((med) => med.inCart)
-  const cartCount = cartItems.reduce(
-    (sum, med) => sum + (med.cartQty || 1),
-    0
-  )
+  const cartCount = cartTotalQty(mergedCartLines)
 
   const handleNavSearch = (q) => {
     const trimmed = q.trim()
@@ -192,7 +183,24 @@ function SearchPage() {
               {!loading && !error && filteredItems.map((med) => (
                 <div className="medicine-card" key={med.id}>
                   <div className="medicine-img">
-                    <i className="bi bi-capsule"></i>
+                    {med.image ? (
+                      <img
+                        src={med.image}
+                        alt={med.name}
+                        loading="lazy"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none'
+                          e.currentTarget.parentElement
+                            ?.querySelector('.medicine-img-fallback')
+                            ?.classList.add('show')
+                        }}
+                      />
+                    ) : null}
+                    <i
+                      className={`bi bi-capsule medicine-img-fallback${
+                        med.image ? '' : ' show'
+                      }`}
+                    ></i>
                   </div>
                   <div className="medicine-body">
                     <div className="medicine-top-row">
@@ -209,9 +217,7 @@ function SearchPage() {
                     </div>
                     <div className="medicine-bottom-row">
                       <div className="medicine-price-row">
-                        <span className="price-current">₹{med.price.toFixed(2)}*</span>
-                        <span className="price-original">₹{med.original.toFixed(2)}</span>
-                        <span className="price-discount">{med.discount}</span>
+                        <span className="price-current">₹{med.price.toFixed(2)}</span>
                       </div>
                       <div className="medicine-action">
                         {med.inCart ? (
@@ -249,6 +255,9 @@ function SearchPage() {
               <div className="sidebar-card cart-summary-card">
               <p className="cart-items-count">
                   {cartCount} Item{cartCount === 1 ? '' : 's'} in Cart
+                </p>
+                <p className="small text-muted mb-2">
+                  Search again to add more medicines, then open your cart and choose a delivery room.
                 </p>
                 <Link to="/cart" className="btn-view-cart">
                   View Cart <i className="bi bi-chevron-right"></i>

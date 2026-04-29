@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { supabase } from '../lib/supabaseClient'
+import { cartTotalQty, readCartLines } from '../lib/cartStorage'
 
 function OrdersPage() {
   const [orders, setOrders] = useState([])
@@ -87,28 +88,11 @@ function OrdersPage() {
     }
   }
 
-  // Keep cart badge in sync using localStorage
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem('medrover_cart')
-      if (!raw) {
-        setCartCount(0)
-        return
-      }
-      const parsed = JSON.parse(raw)
-      if (!Array.isArray(parsed)) {
-        setCartCount(0)
-        return
-      }
-      const count = parsed.reduce(
-        (sum, item) => sum + (item.selectedQty || 1),
-        0
-      )
-      setCartCount(count)
-    } catch (e) {
-      console.error('Failed to load cart count on OrdersPage', e)
-      setCartCount(0)
-    }
+    const refresh = () => setCartCount(cartTotalQty(readCartLines()))
+    refresh()
+    window.addEventListener('medrover_cart_changed', refresh)
+    return () => window.removeEventListener('medrover_cart_changed', refresh)
   }, [])
 
   return (

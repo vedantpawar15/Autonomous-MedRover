@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { supabase } from '../lib/supabaseClient'
+import { cartTotalQty, readCartLines } from '../lib/cartStorage'
 
 function HomePage() {
   const navigate = useNavigate()
@@ -35,27 +36,15 @@ function HomePage() {
     testSupabaseConnection()
   }, [])
 
-  // Load cart count from localStorage so navbar badge matches
+  // Navbar badge: stay in sync when cart updates from search/cart pages
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem('medrover_cart')
-      if (!raw) {
-        setCartCount(0)
-        return
-      }
-      const parsed = JSON.parse(raw)
-      if (!Array.isArray(parsed)) {
-        setCartCount(0)
-        return
-      }
-      const count = parsed.reduce(
-        (sum, item) => sum + (item.selectedQty || 1),
-        0
-      )
-      setCartCount(count)
-    } catch (e) {
-      console.error('Failed to load cart count on HomePage', e)
-      setCartCount(0)
+    const refresh = () => setCartCount(cartTotalQty(readCartLines()))
+    refresh()
+    window.addEventListener('medrover_cart_changed', refresh)
+    window.addEventListener('focus', refresh)
+    return () => {
+      window.removeEventListener('medrover_cart_changed', refresh)
+      window.removeEventListener('focus', refresh)
     }
   }, [])
 

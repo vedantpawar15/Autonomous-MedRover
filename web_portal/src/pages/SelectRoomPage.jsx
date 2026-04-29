@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { supabase } from '../lib/supabaseClient'
+import { clearCart } from '../lib/cartStorage'
 
 const rooms = [
   {
@@ -32,40 +33,50 @@ function SelectRoomPage() {
   const [selectedRoom, setSelectedRoom] = useState('')
   const [orderItems, setOrderItems] = useState([])
   const navigate = useNavigate()
+  const location = useLocation()
 
-  // Load current cart from localStorage to show in order summary
-  useEffect(() => {
+  const loadCartForOrder = () => {
     try {
       const raw = window.localStorage.getItem('medrover_cart')
-      if (!raw) return
+      if (!raw) {
+        setOrderItems([])
+        return
+      }
       const parsed = JSON.parse(raw)
       if (Array.isArray(parsed)) {
         const mapped = parsed.map((item) => ({
           medicineId: item.id,
-          name: `${item.name} (x${item.selectedQty})`,
-          unitMrp: item.originalPrice,
-          unitPrice: item.currentPrice,
-          qty: item.selectedQty
+          name: `${item.name} (x${item.selectedQty || 1})`,
+          unitMrp: item.price,
+          qty: item.selectedQty || 1
         }))
         setOrderItems(mapped)
       }
     } catch (e) {
       console.error('Failed to load cart for order summary', e)
     }
+  }
+
+  useEffect(() => {
+    loadCartForOrder()
+  }, [location.pathname])
+
+  useEffect(() => {
+    const onCartChanged = () => loadCartForOrder()
+    window.addEventListener('medrover_cart_changed', onCartChanged)
+    return () => window.removeEventListener('medrover_cart_changed', onCartChanged)
   }, [])
 
   const cartTotals = useMemo(() => {
     return orderItems.reduce(
       (acc, item) => {
         acc.totalMrp += (item.unitMrp || 0) * (item.qty || 1)
-        acc.totalAmount += (item.unitPrice || 0) * (item.qty || 1)
         return acc
       },
-      { totalMrp: 0, totalAmount: 0 }
+      { totalMrp: 0 }
     )
   }, [orderItems])
 
-  const savings = cartTotals.totalMrp - cartTotals.totalAmount
   const cartCount = orderItems.reduce((sum, item) => sum + (item.qty || 1), 0)
 
   const handleNavSearch = (query) => {
@@ -106,7 +117,7 @@ function SelectRoomPage() {
         order_id: order.id,
         medicine_id: item.medicineId,
         quantity: item.qty || 1,
-        unit_price: item.unitPrice || 0,
+        unit_price: item.unitMrp || 0,
         mrp: item.unitMrp || 0
       }))
 
@@ -120,12 +131,7 @@ function SelectRoomPage() {
         return
       }
 
-      // Clear cart after successful order
-      try {
-        window.localStorage.removeItem('medrover_cart')
-      } catch (e) {
-        console.error('Failed to clear cart after order', e)
-      }
+      clearCart()
 
       navigate('/order-success')
     } catch (e) {
@@ -233,33 +239,19 @@ function SelectRoomPage() {
                   <div className="order-summary-item" key={idx}>
                     <span className="order-summary-name">{item.name}</span>
                     <span className="order-summary-price">
-                      ₹{(item.unitPrice * item.qty).toFixed(2)}
+                      ₹{((item.unitMrp || 0) * (item.qty || 1)).toFixed(2)}
                     </span>
                   </div>
                 ))}
 
                 <hr className="bill-divider" />
 
-                <div className="bill-row">
-                  <span className="bill-label">Total MRP</span>
+                <div className="bill-row bill-total-row">
+                  <span className="bill-label">Total Amount</span>
                   <span className="bill-value">
                     ₹{cartTotals.totalMrp.toFixed(2)}
                   </span>
                 </div>
-
-                <div className="bill-row bill-total-row">
-                  <span className="bill-label">Total Amount</span>
-                  <span className="bill-value">
-                    ₹{cartTotals.totalAmount.toFixed(2)}
-                  </span>
-                </div>
-
-                {savings > 0 && (
-                  <div className="bill-savings">
-                    <i className="bi bi-tag-fill"></i>
-                    You save <strong>₹{savings.toFixed(2)}</strong> on this order
-                  </div>
-                )}
               </div>
 
               {/* Delivery Info Card */}

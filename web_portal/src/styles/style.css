@@ -1051,11 +1051,25 @@ body {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.medicine-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .medicine-img i {
   font-size: 2.2rem;
   color: var(--primary);
+  display: none;
+}
+
+.medicine-img i.show {
+  display: inline-block;
 }
 
 .medicine-body {
@@ -1546,11 +1560,25 @@ body {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.cart-item-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .cart-item-img i {
   font-size: 2.2rem;
   color: var(--primary);
+  display: none;
+}
+
+.cart-item-img i.show {
+  display: inline-block;
 }
 
 .cart-item-body {
@@ -1699,6 +1727,19 @@ body {
 
 .btn-delivery-room i {
   font-size: 1.2rem;
+}
+
+.btn-delivery-room:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.btn-delivery-room:disabled:hover {
+  background: var(--primary);
+  transform: none;
+  box-shadow: none;
 }
 
 /* Cart Sidebar Divider */
