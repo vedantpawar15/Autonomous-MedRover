@@ -27,3 +27,18 @@ npm-debug.log*
 # Lock files (optional — remove this line if you want to commit package-lock.json)
 # package-lock.json
 
+# --- Python / ML (Computer Vision workshop: never commit venvs or downloaded weights)
+**/.venv/
+**/.venv_win/
+**/venv/
+**/__pycache__/
+**/*.py[cod]
+*$py.class
+*.so
+.Python
+ComputerVision/**/*.pt
+ComputerVision/**/runs/
+ComputerVision/**/wandb/
+ComputerVision/**/*.egg-info/
+
+
