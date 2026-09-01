@@ -1,6 +1,6 @@
 /*
  * ============================================================
- *      ESP32 LINE FOLLOWER + HC-SR04 OBSTACLE DETECTION
+ *      ESP32 LINE FOLLOWER + HC-SR04 OBSTACLE DETECTION + Buzzer
  * ============================================================
  *
  * CURRENT STAGE:
