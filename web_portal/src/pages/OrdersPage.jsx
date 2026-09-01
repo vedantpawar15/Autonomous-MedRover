@@ -3,6 +3,7 @@ import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { supabase } from '../lib/supabaseClient'
 import { cartTotalQty, readCartLines } from '../lib/cartStorage'
+import { useAuth } from '../contexts/AuthContext'
 
 function OrdersPage() {
   const [orders, setOrders] = useState([])
@@ -10,6 +11,7 @@ function OrdersPage() {
   const [error, setError] = useState('')
   const [cartCount, setCartCount] = useState(0)
   const [deletingId, setDeletingId] = useState(null)
+  const { user } = useAuth()
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -20,8 +22,9 @@ function OrdersPage() {
         const { data, error: err } = await supabase
           .from('orders')
           .select('*')
+          .eq('user_id', user?.id)        // ← only fetch this user's orders
           .order('created_at', { ascending: false })
-          .limit(20)
+          .limit(50)
 
         if (err) {
           console.error('Error loading orders', err)
