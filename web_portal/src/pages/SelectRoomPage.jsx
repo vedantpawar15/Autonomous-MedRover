@@ -4,7 +4,6 @@ import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { supabase } from '../lib/supabaseClient'
 import { clearCart } from '../lib/cartStorage'
-import { useAuth } from '../contexts/AuthContext'
 
 const rooms = [
   {
@@ -35,7 +34,6 @@ function SelectRoomPage() {
   const [orderItems, setOrderItems] = useState([])
   const navigate = useNavigate()
   const location = useLocation()
-  const { user } = useAuth()
 
   const loadCartForOrder = () => {
     try {
@@ -104,8 +102,7 @@ function SelectRoomPage() {
         .insert({
           room_code: selectedRoom,
           room_label: roomMeta ? roomMeta.ward : null,
-          status: 'pending',
-          user_id: user?.id ?? null,   // link order to authenticated user
+          status: 'pending'
         })
         .select('*')
         .single()

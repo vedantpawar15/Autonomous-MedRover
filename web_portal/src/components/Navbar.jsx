@@ -1,32 +1,21 @@
-import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext'
+import { Link, useLocation } from 'react-router-dom'
 
 /**
  * Navbar — Shared across all pages
  * Props:
- *  - variant: "home" | "inner" | "plain"
- *  - searchValue: string
+ *  - variant: "home" | "inner"  (home has delivery info, inner has search bar)
+ *  - searchValue: string  (pre-fill search input on search page)
  *  - onSearch: (query) => void
  *  - cartCount: number
  */
-function Navbar({ variant = 'inner', searchValue = '', onSearch, cartCount = 0 }) {
-  const location           = useLocation()
-  const navigate           = useNavigate()
-  const { user, signOut }  = useAuth()
+function Navbar({ variant = 'inner', searchValue = '', onSearch, cartCount = 4 }) {
+  const location = useLocation()
 
   const handleSearchSubmit = (e) => {
     e.preventDefault()
     const query = e.target.elements.query.value
     if (onSearch) onSearch(query)
   }
-
-  const handleLogout = async () => {
-    await signOut()
-    navigate('/')
-  }
-
-  // Show first part of email as greeting (e.g. "staff@hospital.com" → "staff")
-  const displayName = user?.email?.split('@')[0] || 'Account'
 
   return (
     <>
@@ -44,16 +33,16 @@ function Navbar({ variant = 'inner', searchValue = '', onSearch, cartCount = 0 }
           </Link>
 
           {/* Separator */}
-          <div className="nav-separator" />
+          <div className="nav-separator"></div>
 
           {/* Home variant: delivery info */}
           {variant === 'home' && (
             <div className="nav-delivery">
               <span className="delivery-label">
-                <i className="bi bi-lightning-charge-fill text-warning" /> Robot delivery to
+                <i className="bi bi-lightning-charge-fill text-warning"></i> Robot delivery to
               </span>
               <span className="delivery-select">
-                Select Room <i className="bi bi-chevron-down" />
+                Select Room <i className="bi bi-chevron-down"></i>
               </span>
             </div>
           )}
@@ -70,48 +59,26 @@ function Navbar({ variant = 'inner', searchValue = '', onSearch, cartCount = 0 }
                 autoComplete="off"
               />
               <button type="submit" className="nav-search-btn">
-                <i className="bi bi-search" />
+                <i className="bi bi-search"></i>
               </button>
             </form>
           )}
 
-          {/* Plain variant: spacer */}
+          {/* Plain variant: no search bar, no delivery info (Cart / Orders / Room pages) */}
           {variant === 'plain' && <div className="nav-plain-spacer" />}
 
-          {/* ── Right actions — auth-aware ── */}
+          {/* Right Actions */}
           <div className="nav-top-right ms-auto d-flex align-items-center">
-
-            {user ? (
-              /* Logged-in state */
-              <>
-                <div className="nav-user-pill">
-                  <i className="bi bi-person-circle nav-user-icon" />
-                  <span className="nav-user-name">{displayName}</span>
-                </div>
-                <button
-                  className="nav-top-action nav-logout-btn"
-                  onClick={handleLogout}
-                  title="Sign out"
-                >
-                  <i className="bi bi-box-arrow-right" />
-                  <span>Logout</span>
-                </button>
-              </>
-            ) : (
-              /* Logged-out state */
-              <Link to="/login" className="nav-top-action nav-login-btn">
-                <i className="bi bi-person" />
-                <span>Log in</span>
-              </Link>
-            )}
-
+            <Link to="#" className="nav-top-action">
+              <i className="bi bi-person"></i>
+              <span>Hello, Log in</span>
+            </Link>
             <Link to="/orders" className="nav-top-action">
-              <i className="bi bi-clipboard2-pulse" />
+              <i className="bi bi-clipboard2-pulse"></i>
               <span>Orders</span>
             </Link>
-
             <Link to="/cart" className="nav-top-action nav-cart-action">
-              <i className="bi bi-cart3" />
+              <i className="bi bi-cart3"></i>
               <span>Cart</span>
               {cartCount > 0 && <span className="cart-badge">{cartCount}</span>}
             </Link>
@@ -124,7 +91,7 @@ function Navbar({ variant = 'inner', searchValue = '', onSearch, cartCount = 0 }
             data-bs-toggle="collapse"
             data-bs-target="#subNavbar"
           >
-            <i className="bi bi-list text-dark" style={{ fontSize: '1.5rem' }} />
+            <i className="bi bi-list text-dark" style={{ fontSize: '1.5rem' }}></i>
           </button>
 
         </div>
@@ -164,15 +131,6 @@ function Navbar({ variant = 'inner', searchValue = '', onSearch, cartCount = 0 }
               <li>
                 <Link to="#">Contact</Link>
               </li>
-              <li>
-                <Link
-                  to="/admin"
-                  className={location.pathname === '/admin' ? 'active' : ''}
-                  style={{ color: 'var(--primary)', fontWeight: 700 }}
-                >
-                  <i className="bi bi-shield-lock-fill me-1" style={{ fontSize: '0.8rem' }} />Admin
-                </Link>
-              </li>
             </ul>
           </div>
         </div>
@@ -182,3 +140,4 @@ function Navbar({ variant = 'inner', searchValue = '', onSearch, cartCount = 0 }
 }
 
 export default Navbar
+
