@@ -1,16 +1,47 @@
-# React + Vite
+# MedRover 3D Digital Twin & Telemetry Simulator 🏥🤖
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+An interactive 3D digital twin dashboard for the Autonomous MedRover system, built using **React 19**, **Three.js**, and **React Three Fiber (`@react-three/fiber`, `@react-three/drei`)**.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 🌟 Features
 
-## React Compiler
+- **3D Hospital Corridor Simulation**: Realistic hospital floor layout with docking bay, junction nodes (J1, J2, J3), rooms A/B/C, and luminous guidance tracks.
+- **Dynamic Rover Mesh**: Rover model with rotating wheels, headlights, and an animated scanning LIDAR beam.
+- **Live Supabase Realtime Telemetry**:
+  - Subscribes to changes on the `rover_status` and `orders` tables.
+  - Automatically mirrors real-world rover missions and kinematics in 3D.
+- **Multi-Camera Director**:
+  - **Free Orbit**: OrbitControls for panning, zooming, and inspecting from any angle.
+  - **Top-Down**: 2D overhead map perspective for hospital floor overview.
+  - **Follow Rover**: 3rd-person chase camera locked to the rover during navigation.
+- **Interactive Telemetry HUD**:
+  - Live indicators for Battery %, Wi-Fi RSSI (dBm), (X, Z) coordinates, yaw angle, speed, and mission progress.
+  - Manual mission dispatch buttons (Room A, Room B, Room C).
+  - Emergency Stop and Return-to-Base controls.
+  - Standalone simulation toggle for testing without active hardware.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the Oxlint configuration
+## 🚀 Quick Start
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+```bash
+# Install dependencies
+npm install
+
+# Configure environment
+cp ../web_portal/.env.example .env
+```
+
+Ensure `.env` contains:
+```env
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+```
+
+Run development server:
+```bash
+npm run dev -- --port 5174
+```
+
+Access the 3D twin in your browser at `http://localhost:5174`.

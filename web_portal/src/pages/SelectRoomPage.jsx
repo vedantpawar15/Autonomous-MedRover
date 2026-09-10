@@ -4,6 +4,8 @@ import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { supabase } from '../lib/supabaseClient'
 import { clearCart } from '../lib/cartStorage'
+import { useAuth } from '../contexts/AuthContext'
+import { cacheActiveDelivery, saveOfflineOrder } from '../lib/deliveryCache'
 
 const rooms = [
   {
@@ -34,6 +36,7 @@ function SelectRoomPage() {
   const [orderItems, setOrderItems] = useState([])
   const navigate = useNavigate()
   const location = useLocation()
+  const { user } = useAuth()
 
   const loadCartForOrder = () => {
     try {
@@ -89,54 +92,67 @@ function SelectRoomPage() {
       return
     }
 
-    if (!supabase) {
-      alert('Supabase is not configured. Please check your .env.')
+    const roomMeta = rooms.find((r) => r.id === selectedRoom)
+    const orderPayload = {
+      room_code: selectedRoom,
+      room_label: roomMeta ? roomMeta.ward : null,
+      status: 'pending',
+      user_id: user?.id ?? null,
+    }
+
+    const itemsPayload = orderItems.map((item) => ({
+      medicine_id: item.medicineId,
+      quantity: item.qty || 1,
+      unit_price: item.unitMrp || 0,
+      mrp: item.unitMrp || 0,
+    }))
+
+    // ── Offline fallback: If internet is down right now, save directly to cache memory ──
+    if (!navigator.onLine || !supabase) {
+      saveOfflineOrder(orderPayload, itemsPayload)
+      clearCart()
+      navigate('/order-success')
       return
     }
 
     try {
-      const roomMeta = rooms.find((r) => r.id === selectedRoom)
-
       const { data: order, error: orderError } = await supabase
         .from('orders')
-        .insert({
-          room_code: selectedRoom,
-          room_label: roomMeta ? roomMeta.ward : null,
-          status: 'pending'
-        })
+        .insert(orderPayload)
         .select('*')
         .single()
 
       if (orderError || !order) {
-        console.error('Error creating order', orderError)
-        alert('Could not place order. Please try again.')
+        console.warn('Network issue during order placement, saving to cache memory...', orderError)
+        saveOfflineOrder(orderPayload, itemsPayload)
+        clearCart()
+        navigate('/order-success')
         return
       }
 
-      const itemsPayload = orderItems.map((item) => ({
+      // Order created online -> cache active delivery immediately
+      cacheActiveDelivery(order)
+
+      const mappedItems = itemsPayload.map((it) => ({
+        ...it,
         order_id: order.id,
-        medicine_id: item.medicineId,
-        quantity: item.qty || 1,
-        unit_price: item.unitMrp || 0,
-        mrp: item.unitMrp || 0
       }))
 
       const { error: itemsError } = await supabase
         .from('order_items')
-        .insert(itemsPayload)
+        .insert(mappedItems)
 
       if (itemsError) {
         console.error('Error creating order items', itemsError)
-        alert('Order created but items could not be saved.')
-        return
       }
 
       clearCart()
-
       navigate('/order-success')
     } catch (e) {
-      console.error('Exception while placing order', e)
-      alert('Unexpected error while placing order.')
+      console.warn('Exception during order creation, fallback to cache memory', e)
+      saveOfflineOrder(orderPayload, itemsPayload)
+      clearCart()
+      navigate('/order-success')
     }
   }
 

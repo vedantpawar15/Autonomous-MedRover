@@ -3,42 +3,59 @@ import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { supabase } from '../lib/supabaseClient'
 import { cartTotalQty, readCartLines } from '../lib/cartStorage'
+import { useAuth } from '../contexts/AuthContext'
+import { cacheUserOrders, getCachedUserOrders } from '../lib/deliveryCache'
+import { enqueue } from '../lib/syncQueue'
 
 function OrdersPage() {
-  const [orders, setOrders] = useState([])
+  const { user } = useAuth()
+  const [orders, setOrders] = useState(() => getCachedUserOrders(user?.id))
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [cartCount, setCartCount] = useState(0)
   const [deletingId, setDeletingId] = useState(null)
 
   useEffect(() => {
+    // 1. Instantly show cached orders from memory
+    const cached = getCachedUserOrders(user?.id)
+    if (cached && cached.length > 0) {
+      setOrders(cached)
+    }
+
+    if (!supabase || !user?.id || !navigator.onLine) {
+      return
+    }
+
     const fetchOrders = async () => {
-      if (!supabase) return
       setLoading(true)
       setError('')
       try {
         const { data, error: err } = await supabase
           .from('orders')
           .select('*')
+          .eq('user_id', user?.id)
           .order('created_at', { ascending: false })
-          .limit(20)
+          .limit(50)
 
         if (err) {
-          console.error('Error loading orders', err)
-          setError('Could not load orders from server.')
+          if (!cached || cached.length === 0) {
+            setError('Could not load orders from server.')
+          }
         } else {
           setOrders(data || [])
+          cacheUserOrders(user?.id, data || [])
         }
       } catch (e) {
-        console.error('Exception loading orders', e)
-        setError('Unexpected error while loading orders.')
+        if (!cached || cached.length === 0) {
+          setError('Network disconnected. Displaying cached orders.')
+        }
       } finally {
         setLoading(false)
       }
     }
 
     fetchOrders()
-  }, [])
+  }, [user?.id])
 
   const handleDeleteOrder = async (order) => {
     if (!supabase) {
@@ -54,35 +71,35 @@ function OrdersPage() {
     setDeletingId(order.id)
     setError('')
 
-    // Optimistic UI update
+    // 1. Optimistic UI and Cache memory update
     const prev = orders
-    setOrders((cur) => cur.filter((o) => o.id !== order.id))
+    const remaining = orders.filter((o) => o.id !== order.id)
+    setOrders(remaining)
+    cacheUserOrders(user?.id, remaining)
+
+    // 2. If offline, enqueue and return cleanly
+    if (!supabase || !navigator.onLine) {
+      enqueue('DELETE_ORDER', { orderId: order.id })
+      setDeletingId(null)
+      return
+    }
 
     try {
-      // If you have a separate table for order items, delete them first.
-      // If your DB has ON DELETE CASCADE, this is still safe (it will just delete 0 rows if none exist).
       const { error: itemsErr } = await supabase
         .from('order_items')
         .delete()
         .eq('order_id', order.id)
 
-      if (itemsErr) {
-        console.error('Error deleting order items', itemsErr)
-        throw itemsErr
-      }
+      if (itemsErr) throw itemsErr
 
       const { error: orderErr } = await supabase
         .from('orders')
         .delete()
         .eq('id', order.id)
 
-      if (orderErr) {
-        console.error('Error deleting order', orderErr)
-        throw orderErr
-      }
+      if (orderErr) throw orderErr
     } catch (e) {
-      setOrders(prev)
-      setError('Could not delete order. Please try again.')
+      enqueue('DELETE_ORDER', { orderId: order.id })
     } finally {
       setDeletingId(null)
     }
