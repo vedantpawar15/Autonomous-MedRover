@@ -105,6 +105,18 @@ function Navbar({ variant = 'inner', searchValue = '', onSearch, cartCount = 0 }
               </Link>
             )}
 
+            <a
+              href="http://localhost:5173"
+              target="_blank"
+              rel="noreferrer"
+              className="nav-top-action d-none d-md-flex align-items-center gap-1.5"
+              style={{ color: '#0284c7', fontWeight: 600 }}
+              title="Track autonomous robot in 3D Digital Twin"
+            >
+              <i className="bi bi-broadcast text-primary animate-pulse" />
+              <span>3D Twin</span>
+            </a>
+
             <Link to="/orders" className="nav-top-action">
               <i className="bi bi-clipboard2-pulse" />
               <span>Orders</span>

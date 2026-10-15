@@ -141,6 +141,18 @@ function OrdersPage() {
                     </div>
                   </div>
                   <div className="d-flex align-items-center gap-2">
+                    {(order.status === 'pending' || order.status === 'in_transit') && (
+                      <a
+                        href="http://localhost:5173"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1"
+                        style={{ fontSize: '0.78rem', fontWeight: 600 }}
+                        title="Track MedRover live in 3D Digital Twin"
+                      >
+                        <i className="bi bi-broadcast" /> Track 3D
+                      </a>
+                    )}
                     <span className="badge bg-success-subtle text-success">
                       {order.status}
                     </span>

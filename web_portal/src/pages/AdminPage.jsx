@@ -14,9 +14,9 @@ import { enqueue } from '../lib/syncQueue'
 
 // â”€â”€ Status helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const STATUS_META = {
-  pending    : { bg: '#fef9c3', color: '#854d0e', label: 'Pending'    },
-  in_transit : { bg: '#dbeafe', color: '#1e40af', label: 'In Transit' },
-  delivered  : { bg: '#dcfce7', color: '#166534', label: 'Delivered'  },
+  pending: { bg: '#fef9c3', color: '#854d0e', label: 'Pending' },
+  in_transit: { bg: '#dbeafe', color: '#1e40af', label: 'In Transit' },
+  delivered: { bg: '#dcfce7', color: '#166534', label: 'Delivered' },
 }
 
 function StatusBadge({ status }) {
@@ -32,7 +32,7 @@ function StatusBadge({ status }) {
 // OVERVIEW TAB
 // ——————————————————————————————————————————————————————————————————————————————
 function OverviewTab() {
-  const [stats,   setStats]   = useState({ total: 0, pending: 0, in_transit: 0, delivered: 0, medicines: 0 })
+  const [stats, setStats] = useState({ total: 0, pending: 0, in_transit: 0, delivered: 0, medicines: 0 })
   const [loading, setLoading] = useState(true)
 
   const fetchStats = useCallback(async () => {
@@ -45,11 +45,11 @@ function OverviewTab() {
       ])
       const o = ordRes.data || []
       setStats({
-        total      : o.length,
-        pending    : o.filter(x => x.status === 'pending').length,
-        in_transit : o.filter(x => x.status === 'in_transit').length,
-        delivered  : o.filter(x => x.status === 'delivered').length,
-        medicines  : medRes.count || 0,
+        total: o.length,
+        pending: o.filter(x => x.status === 'pending').length,
+        in_transit: o.filter(x => x.status === 'in_transit').length,
+        delivered: o.filter(x => x.status === 'delivered').length,
+        medicines: medRes.count || 0,
       })
     } catch (e) { console.error(e) }
     finally { setLoading(false) }
@@ -58,11 +58,11 @@ function OverviewTab() {
   useEffect(() => { fetchStats() }, [fetchStats])
 
   const cards = [
-    { label: 'Total Orders',   value: stats.total,      icon: 'bi-clipboard2-pulse-fill', iconBg: 'rgba(26,60,74,0.1)',    iconColor: '#1a3c4a'  },
-    { label: 'Pending',        value: stats.pending,    icon: 'bi-hourglass-split',       iconBg: 'rgba(234,179,8,0.12)',  iconColor: '#ca8a04'  },
-    { label: 'In Transit',     value: stats.in_transit, icon: 'bi-robot',                 iconBg: 'rgba(37,99,235,0.1)',   iconColor: '#2563eb'  },
-    { label: 'Delivered',      value: stats.delivered,  icon: 'bi-check2-circle',         iconBg: 'rgba(22,163,74,0.1)',   iconColor: '#16a34a'  },
-    { label: 'Medicines',      value: stats.medicines,  icon: 'bi-capsule',               iconBg: 'rgba(139,92,246,0.1)',  iconColor: '#7c3aed'  },
+    { label: 'Total Orders', value: stats.total, icon: 'bi-clipboard2-pulse-fill', iconBg: 'rgba(26,60,74,0.1)', iconColor: '#1a3c4a' },
+    { label: 'Pending', value: stats.pending, icon: 'bi-hourglass-split', iconBg: 'rgba(234,179,8,0.12)', iconColor: '#ca8a04' },
+    { label: 'In Transit', value: stats.in_transit, icon: 'bi-robot', iconBg: 'rgba(37,99,235,0.1)', iconColor: '#2563eb' },
+    { label: 'Delivered', value: stats.delivered, icon: 'bi-check2-circle', iconBg: 'rgba(22,163,74,0.1)', iconColor: '#16a34a' },
+    { label: 'Medicines', value: stats.medicines, icon: 'bi-capsule', iconBg: 'rgba(139,92,246,0.1)', iconColor: '#7c3aed' },
   ]
 
   return (
@@ -114,11 +114,11 @@ function OverviewTab() {
 // ORDERS TAB
 // ——————————————————————————————————————————————————————————————————————————————
 function OrdersTab() {
-  const [orders,     setOrders]     = useState(getCachedOrders)
-  const [loading,    setLoading]    = useState(false)
-  const [error,      setError]      = useState('')
-  const [filter,     setFilter]     = useState('all')
-  const [search,     setSearch]     = useState('')
+  const [orders, setOrders] = useState(getCachedOrders)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [filter, setFilter] = useState('all')
+  const [search, setSearch] = useState('')
   const [updatingId, setUpdatingId] = useState(null)
   const [deletingId, setDeletingId] = useState(null)
 
@@ -214,7 +214,7 @@ function OrdersTab() {
   const filtered = orders.filter(o => {
     const ms = filter === 'all' || o.status === filter
     const mq = !search || String(o.id).includes(search) ||
-                (o.room_code || '').toLowerCase().includes(search.toLowerCase())
+      (o.room_code || '').toLowerCase().includes(search.toLowerCase())
     return ms && mq
   })
 
@@ -245,10 +245,10 @@ function OrdersTab() {
         />
         <div className="admin-filter-pills">
           {[
-            { k: 'all',        l: 'All'        },
-            { k: 'pending',    l: 'Pending'    },
+            { k: 'all', l: 'All' },
+            { k: 'pending', l: 'Pending' },
             { k: 'in_transit', l: 'In Transit' },
-            { k: 'delivered',  l: 'Delivered'  },
+            { k: 'delivered', l: 'Delivered' },
           ].map(f => (
             <button key={f.k} className={`admin-filter-pill${filter === f.k ? ' active' : ''}`}
               onClick={() => setFilter(f.k)}>
@@ -260,7 +260,7 @@ function OrdersTab() {
       </div>
 
       {loading && <div className="admin-loading"><div className="admin-spinner" /><span>Loading orders…</span></div>}
-      {error   && <div className="admin-error-msg"><i className="bi bi-exclamation-triangle-fill" /> {error}</div>}
+      {error && <div className="admin-error-msg"><i className="bi bi-exclamation-triangle-fill" /> {error}</div>}
 
       {!loading && !error && (
         <div className="admin-table-wrapper">
@@ -330,14 +330,14 @@ function OrdersTab() {
 const EMPTY = { name: '', brand: '', pack_info: '', image_url: '', mrp: '', requires_rx: false }
 
 function MedicinesTab() {
-  const [medicines,  setMedicines]  = useState([])
-  const [loading,    setLoading]    = useState(true)
-  const [error,      setError]      = useState('')
-  const [search,     setSearch]     = useState('')
-  const [showModal,  setShowModal]  = useState(false)
-  const [editMed,    setEditMed]    = useState(null)
-  const [form,       setForm]       = useState(EMPTY)
-  const [saving,     setSaving]     = useState(false)
+  const [medicines, setMedicines] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [search, setSearch] = useState('')
+  const [showModal, setShowModal] = useState(false)
+  const [editMed, setEditMed] = useState(null)
+  const [form, setForm] = useState(EMPTY)
+  const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
 
   const fetchMedicines = useCallback(async () => {
@@ -354,11 +354,13 @@ function MedicinesTab() {
 
   useEffect(() => { fetchMedicines() }, [fetchMedicines])
 
-  const openAdd  = () => { setEditMed(null); setForm(EMPTY); setShowModal(true) }
+  const openAdd = () => { setEditMed(null); setForm(EMPTY); setShowModal(true) }
   const openEdit = (m) => {
     setEditMed(m)
-    setForm({ name: m.name||'', brand: m.brand||'', pack_info: m.pack_info||'',
-              image_url: m.image_url||'', mrp: m.mrp??'', requires_rx: !!m.requires_rx })
+    setForm({
+      name: m.name || '', brand: m.brand || '', pack_info: m.pack_info || '',
+      image_url: m.image_url || '', mrp: m.mrp ?? '', requires_rx: !!m.requires_rx
+    })
     setShowModal(true)
   }
 
@@ -426,7 +428,7 @@ function MedicinesTab() {
       </div>
 
       {loading && <div className="admin-loading"><div className="admin-spinner" /><span>Loading medicines…</span></div>}
-      {error   && <div className="admin-error-msg"><i className="bi bi-exclamation-triangle-fill" /> {error}</div>}
+      {error && <div className="admin-error-msg"><i className="bi bi-exclamation-triangle-fill" /> {error}</div>}
 
       {!loading && !error && (
         <div className="admin-table-wrapper">
@@ -438,7 +440,7 @@ function MedicinesTab() {
                 <th>Pack</th>
                 <th>MRP</th>
                 <th>Rx</th>
-                <th style={{width:80}}>Actions</th>
+                <th style={{ width: 80 }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -449,12 +451,12 @@ function MedicinesTab() {
               ) : filtered.map(m => (
                 <tr key={m.id} className={deletingId === m.id ? 'admin-row-deleting' : ''}>
                   <td><strong>{m.name}</strong></td>
-                  <td style={{color:'#6b7c8a'}}>{m.brand || '—'}</td>
-                  <td style={{color:'#6b7c8a',fontSize:'0.82rem'}}>{m.pack_info || '—'}</td>
-                  <td><strong>₹{Number(m.mrp||0).toFixed(2)}</strong></td>
+                  <td style={{ color: '#6b7c8a' }}>{m.brand || '—'}</td>
+                  <td style={{ color: '#6b7c8a', fontSize: '0.82rem' }}>{m.pack_info || '—'}</td>
+                  <td><strong>₹{Number(m.mrp || 0).toFixed(2)}</strong></td>
                   <td>
                     {m.requires_rx
-                      ? <span className="admin-rx-yes"><i className="bi bi-check-circle-fill me-1"/>Yes</span>
+                      ? <span className="admin-rx-yes"><i className="bi bi-check-circle-fill me-1" />Yes</span>
                       : <span className="admin-rx-no">No</span>}
                   </td>
                   <td>
@@ -482,7 +484,7 @@ function MedicinesTab() {
             <div className="admin-modal-header">
               <h5>
                 <i className={`bi ${editMed ? 'bi-pencil-square' : 'bi-plus-circle-fill'} me-2`}
-                  style={{color:'#1E7F78'}} />
+                  style={{ color: '#1E7F78' }} />
                 {editMed ? 'Edit Medicine' : 'Add Medicine'}
               </h5>
               <button className="admin-modal-close" onClick={() => setShowModal(false)}>
@@ -494,34 +496,34 @@ function MedicinesTab() {
                 <div className="admin-form-group">
                   <label>Name *</label>
                   <input type="text" required placeholder="e.g. Paracetamol 500mg"
-                    value={form.name} onChange={e => setForm(f=>({...f,name:e.target.value}))} />
+                    value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
                 </div>
                 <div className="admin-form-group">
                   <label>Brand *</label>
                   <input type="text" required placeholder="e.g. Cipla"
-                    value={form.brand} onChange={e => setForm(f=>({...f,brand:e.target.value}))} />
+                    value={form.brand} onChange={e => setForm(f => ({ ...f, brand: e.target.value }))} />
                 </div>
                 <div className="admin-form-group">
                   <label>Pack Info</label>
                   <input type="text" placeholder="e.g. 10 tablets / strip"
-                    value={form.pack_info} onChange={e => setForm(f=>({...f,pack_info:e.target.value}))} />
+                    value={form.pack_info} onChange={e => setForm(f => ({ ...f, pack_info: e.target.value }))} />
                 </div>
                 <div className="admin-form-group">
                   <label>MRP (₹) *</label>
                   <input type="number" required min="0" step="0.01" placeholder="25.50"
-                    value={form.mrp} onChange={e => setForm(f=>({...f,mrp:e.target.value}))} />
+                    value={form.mrp} onChange={e => setForm(f => ({ ...f, mrp: e.target.value }))} />
                 </div>
-                <div className="admin-form-group" style={{gridColumn:'1 / -1'}}>
+                <div className="admin-form-group" style={{ gridColumn: '1 / -1' }}>
                   <label>Image URL (optional)</label>
                   <input type="url" placeholder="https://…"
-                    value={form.image_url} onChange={e => setForm(f=>({...f,image_url:e.target.value}))} />
+                    value={form.image_url} onChange={e => setForm(f => ({ ...f, image_url: e.target.value }))} />
                 </div>
-                <div className="admin-form-group admin-checkbox-group" style={{gridColumn:'1 / -1'}}>
+                <div className="admin-form-group admin-checkbox-group" style={{ gridColumn: '1 / -1' }}>
                   <label className="admin-checkbox-label">
                     <input type="checkbox" checked={form.requires_rx}
-                      onChange={e => setForm(f=>({...f,requires_rx:e.target.checked}))} />
+                      onChange={e => setForm(f => ({ ...f, requires_rx: e.target.checked }))} />
                     Requires Prescription (Rx)
-                    <span style={{fontWeight:400,color:'#8a9bae',marginLeft:6,fontSize:'0.82rem'}}>
+                    <span style={{ fontWeight: 400, color: '#8a9bae', marginLeft: 6, fontSize: '0.82rem' }}>
                       — customer must show valid prescription
                     </span>
                   </label>
@@ -549,12 +551,14 @@ function MedicinesTab() {
 // ROBOT TAB
 // ——————————————————————————————————————————————————————————————————————————————
 function RobotTab() {
-  const [active,  setActive]  = useState(getActiveDelivery)
-  const [recent,  setRecent]  = useState(() => getCachedOrders().slice(0, 8))
+  const [active, setActive] = useState(getActiveDelivery)
+  const [recent, setRecent] = useState(() => getCachedOrders().slice(0, 8))
   const [loading, setLoading] = useState(false)
+  const [telemetry, setTelemetry] = useState(null)
+  const [dispatching, setDispatching] = useState(false)
+  const [twinKey, setTwinKey] = useState(0)
 
   const fetchStatus = useCallback(async () => {
-    // 1. Check local delivery cache memory first
     const cachedActive = getActiveDelivery()
     if (cachedActive) setActive(cachedActive)
     const cachedOrders = getCachedOrders()
@@ -568,11 +572,12 @@ function RobotTab() {
 
     setLoading(true)
     try {
-      const [aRes, rRes] = await Promise.all([
-        supabase.from('orders').select('*').eq('status','in_transit')
-          .order('created_at',{ascending:false}).limit(1),
+      const [aRes, rRes, tRes] = await Promise.all([
+        supabase.from('orders').select('*').in('status', ['pending', 'in_transit'])
+          .order('created_at', { ascending: false }).limit(1),
         supabase.from('orders').select('*')
-          .order('created_at',{ascending:false}).limit(8),
+          .order('created_at', { ascending: false }).limit(8),
+        supabase.from('rover_status').select('*').limit(1),
       ])
       const activeOrd = aRes.data?.[0] || null
       setActive(activeOrd)
@@ -580,14 +585,69 @@ function RobotTab() {
         cacheActiveDelivery(activeOrd)
       }
       setRecent(rRes.data || [])
-    } catch(e) {
+      if (tRes.data?.[0]) {
+        setTelemetry(tRes.data[0])
+      }
+    } catch (e) {
       console.error(e)
     } finally {
       setLoading(false)
     }
   }, [])
 
-  useEffect(() => { fetchStatus() }, [fetchStatus])
+  // Initial fetch and Realtime Supabase Subscription
+  useEffect(() => {
+    fetchStatus()
+
+    if (!supabase) return
+
+    const channel = supabase
+      .channel('admin_robot_tracker')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+        fetchStatus()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'rover_status' }, (payload) => {
+        if (payload.new) {
+          setTelemetry(payload.new)
+        }
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [fetchStatus])
+
+  // Quick dispatch action directly from Admin page
+  const handleQuickDispatch = async (roomCode, roomLabel) => {
+    if (!supabase) {
+      alert('Supabase is not configured.')
+      return
+    }
+
+    setDispatching(true)
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .insert({
+          room_code: roomCode,
+          room_label: roomLabel,
+          status: 'pending',
+          notes: 'Dispatched via Admin Live Control'
+        })
+        .select('*')
+        .single()
+
+      if (error) throw error
+      setActive(data)
+      cacheActiveDelivery(data)
+      fetchStatus()
+    } catch (err) {
+      alert('Error dispatching mission: ' + err.message)
+    } finally {
+      setDispatching(false)
+    }
+  }
 
   const fmt = (d) => new Date(d).toLocaleString('en-IN', {
     day: '2-digit', month: 'short', year: 'numeric',
@@ -600,18 +660,30 @@ function RobotTab() {
     <div>
       <div className="admin-tab-header">
         <div>
-          <h4 className="admin-tab-title">Robot Status</h4>
-          <p className="admin-tab-subtitle">Live MedRover delivery tracking</p>
+          <h4 className="admin-tab-title">Robot Status & 3D Digital Twin</h4>
+          <p className="admin-tab-subtitle">Live MedRover autonomous delivery tracking synced with hardware</p>
         </div>
-        <button className="admin-refresh-btn" onClick={fetchStatus}>
-          <i className="bi bi-arrow-clockwise" /> Refresh
-        </button>
+        <div className="d-flex align-items-center gap-2">
+          <a
+            href="http://localhost:5173"
+            target="_blank"
+            rel="noreferrer"
+            className="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1.5"
+            style={{ borderRadius: '8px', fontWeight: 600 }}
+          >
+            <i className="bi bi-box-arrow-up-right" /> Open 3D Twin Fullscreen
+          </a>
+          <button className="admin-refresh-btn" onClick={fetchStatus}>
+            <i className="bi bi-arrow-clockwise" /> Refresh
+          </button>
+        </div>
       </div>
 
-      {loading ? (
-        <div className="admin-loading"><div className="admin-spinner" /><span>Checking robot statusâ€¦</span></div>
+      {loading && !active ? (
+        <div className="admin-loading"><div className="admin-spinner" /><span>Checking robot status…</span></div>
       ) : (
         <>
+          {/* Active Mission Status Card */}
           <div className={`robot-status-card ${isActive ? 'active' : 'idle'} mb-4`}>
             <div className="robot-status-icon-wrap">
               <i className="bi bi-robot" />
@@ -620,27 +692,153 @@ function RobotTab() {
             <div className="robot-status-info">
               <h5 className="robot-status-label">
                 <span className={`robot-status-dot ${isActive ? 'green' : 'grey'}`} />
-                {isActive ? 'MedRover is delivering now' : 'MedRover is idle'}
+                {isActive ? `MedRover is Active (${active.status?.toUpperCase()})` : 'MedRover is Idle at Base Dock'}
               </h5>
               {isActive ? (
                 <div className="robot-active-details">
                   <p>
                     Delivering <strong>Order #{active.id}</strong> to{' '}
                     <strong>Room {active.room_code}</strong>
-                    {active.room_label && ` Â· ${active.room_label}`}
+                    {active.room_label && ` · ${active.room_label}`}
                   </p>
-                  <p style={{marginTop:4,fontSize:'0.8rem',color:'#8a9bae'}}>
-                    Dispatched {fmt(active.created_at)}
+                  <p style={{ marginTop: 4, fontSize: '0.8rem', color: '#8a9bae' }}>
+                    Dispatched {fmt(active.created_at)} · Status: <strong>{active.status}</strong>
                   </p>
                 </div>
               ) : (
-                <p style={{color:'#8a9bae',fontSize:'0.88rem',margin:0}}>
-                  No active delivery. Robot is docked and ready.
+                <p style={{ color: '#8a9bae', fontSize: '0.88rem', margin: 0 }}>
+                  No active delivery. Robot is docked at Base Charging Pad and waiting for orders.
                 </p>
               )}
             </div>
           </div>
 
+          {/* Quick Hardware Dispatch Panel */}
+          <div className="sidebar-card mb-4" style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '18px' }}>
+            <div className="d-flex align-items-center justify-between mb-2">
+              <div className="d-flex align-items-center gap-2">
+                <i className="bi bi-send-fill text-primary" />
+                <span className="fw-bold text-dark" style={{ fontSize: '0.95rem' }}>Direct Mission Dispatch (Triggers Real ESP32 & 3D Twin)</span>
+              </div>
+              <span className="badge bg-primary-subtle text-primary">Live Hardware Sync</span>
+            </div>
+            <p className="text-muted small mb-3">
+              Clicking a destination inserts an order into Supabase, instantly notifying the physical rover over Wi-Fi and driving the 3D Digital Twin.
+            </p>
+            <div className="d-flex gap-2 flex-wrap">
+              <button
+                type="button"
+                className="btn btn-outline-primary btn-sm d-flex align-items-center gap-1.5 px-3 py-2"
+                onClick={() => handleQuickDispatch('A', 'Room A - General Ward')}
+                disabled={dispatching || isActive}
+                style={{ borderRadius: '10px', fontWeight: 600 }}
+              >
+                <i className="bi bi-play-circle-fill text-primary" /> Dispatch Room A (General)
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline-danger btn-sm d-flex align-items-center gap-1.5 px-3 py-2"
+                onClick={() => handleQuickDispatch('B', 'Room B - ICU Ward')}
+                disabled={dispatching || isActive}
+                style={{ borderRadius: '10px', fontWeight: 600 }}
+              >
+                <i className="bi bi-play-circle-fill text-danger" /> Dispatch Room B (ICU)
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1.5 px-3 py-2"
+                onClick={() => handleQuickDispatch('C', 'Room C - Pediatric Ward')}
+                disabled={dispatching || isActive}
+                style={{ borderRadius: '10px', fontWeight: 600 }}
+              >
+                <i className="bi bi-play-circle-fill text-secondary" /> Dispatch Room C (Pediatric)
+              </button>
+            </div>
+          </div>
+
+          {/* 3D Digital Twin Live Embedded View */}
+          <div className="mb-4" style={{ borderRadius: '16px', overflow: 'hidden', border: '1px solid #0f172a', background: '#090d16', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)' }}>
+            <div className="d-flex align-items-center justify-between px-3 py-2" style={{ background: '#0f172a', borderBottom: '1px solid #1e293b' }}>
+              <div className="d-flex align-items-center gap-2 text-white">
+                <span className="w-2 h-2 rounded-full bg-success animate-pulse" style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981' }} />
+                <span style={{ fontSize: '0.82rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#38bdf8' }}>
+                  Live 3D Digital Twin &bull; Real-Time View
+                </span>
+                <span className="badge bg-dark border border-secondary text-info" style={{ fontSize: '0.7rem' }}>
+                  Port 5173
+                </span>
+              </div>
+              <div className="d-flex align-items-center gap-2">
+                <button
+                  type="button"
+                  className="btn btn-sm btn-dark text-muted py-0 px-2"
+                  onClick={() => setTwinKey((k) => k + 1)}
+                  title="Reload 3D View"
+                  style={{ fontSize: '0.75rem', border: '1px solid #334155' }}
+                >
+                  <i className="bi bi-arrow-clockwise me-1" /> Reload
+                </button>
+                <a
+                  href="http://localhost:5173"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn btn-sm btn-info py-0 px-2 text-dark fw-bold"
+                  style={{ fontSize: '0.75rem' }}
+                >
+                  <i className="bi bi-arrows-fullscreen me-1" /> Expand
+                </a>
+              </div>
+            </div>
+
+            <iframe
+              key={twinKey}
+              src="http://localhost:5173"
+              title="MedRover 3D Digital Twin Simulator"
+              style={{
+                width: '100%',
+                height: '520px',
+                border: 'none',
+                display: 'block',
+                background: '#090d16'
+              }}
+            />
+          </div>
+
+          {/* Live Telemetry Data Feed */}
+          {telemetry && (
+            <div className="row g-3 mb-4">
+              <div className="col-6 col-md-3">
+                <div className="p-3 rounded-3 border bg-white shadow-sm">
+                  <div className="text-muted small text-uppercase fw-bold">Live Speed</div>
+                  <div className="fs-5 fw-bold text-dark">{telemetry.speed || 0} m/s</div>
+                  <small className="text-muted">{((telemetry.speed || 0) * 3.6).toFixed(1)} km/h</small>
+                </div>
+              </div>
+              <div className="col-6 col-md-3">
+                <div className="p-3 rounded-3 border bg-white shadow-sm">
+                  <div className="text-muted small text-uppercase fw-bold">Coordinates (X, Z)</div>
+                  <div className="fs-5 fw-bold text-primary font-monospace">{telemetry.pos_x || 0}, {telemetry.pos_z || 0}</div>
+                  <small className="text-muted">Yaw: {Math.round(telemetry.yaw || 0)}°</small>
+                </div>
+              </div>
+              <div className="col-6 col-md-3">
+                <div className="p-3 rounded-3 border bg-white shadow-sm">
+                  <div className="text-muted small text-uppercase fw-bold">Battery</div>
+                  <div className="fs-5 fw-bold text-success">{telemetry.battery || 100}%</div>
+                  <small className="text-muted">Li-ion 2S Pack</small>
+                </div>
+              </div>
+              <div className="col-6 col-md-3">
+                <div className="p-3 rounded-3 border bg-white shadow-sm">
+                  <div className="text-muted small text-uppercase fw-bold">Target Room</div>
+                  <div className="fs-5 fw-bold text-info">{telemetry.target_room ? `Room ${telemetry.target_room}` : 'Dock Station'}</div>
+                  <small className="text-muted">State: {telemetry.state || 'idle'}</small>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Recent Deliveries */}
           {recent.length > 0 && (
             <>
               <h6 className="admin-section-subtitle mb-3">Recent Deliveries</h6>
@@ -648,15 +846,15 @@ function RobotTab() {
                 {recent.map((o, idx) => (
                   <div className="robot-timeline-item" key={o.id}>
                     <div className={`robot-timeline-dot ${o.status}`} />
-                    {idx < recent.length-1 && <div className="robot-timeline-line" />}
+                    {idx < recent.length - 1 && <div className="robot-timeline-line" />}
                     <div className="robot-timeline-content">
                       <div className="robot-timeline-title">
-                        Order #{o.id} â†’ Room {o.room_code}
+                        Order #{o.id} → Room {o.room_code}
                         <StatusBadge status={o.status} />
                       </div>
                       <div className="robot-timeline-date">
                         {fmt(o.created_at)}
-                        {o.room_label && <span style={{marginLeft:8,color:'#b0bac5'}}>Â· {o.room_label}</span>}
+                        {o.room_label && <span style={{ marginLeft: 8, color: '#b0bac5' }}>· {o.room_label}</span>}
                       </div>
                     </div>
                   </div>
@@ -674,9 +872,9 @@ function RobotTab() {
 // USERS TAB
 // ——————————————————————————————————————————————————————————————————————————————
 const USER_STATUS_META = {
-  pending  : { bg: '#fef9c3', color: '#854d0e', label: 'Pending'  },
-  approved : { bg: '#dcfce7', color: '#166534', label: 'Approved' },
-  rejected : { bg: '#fee2e2', color: '#991b1b', label: 'Rejected' },
+  pending: { bg: '#fef9c3', color: '#854d0e', label: 'Pending' },
+  approved: { bg: '#dcfce7', color: '#166534', label: 'Approved' },
+  rejected: { bg: '#fee2e2', color: '#991b1b', label: 'Rejected' },
 }
 
 function UserStatusBadge({ status }) {
@@ -689,11 +887,11 @@ function UserStatusBadge({ status }) {
 }
 
 function UsersTab() {
-  const [users,      setUsers]      = useState([])
-  const [loading,    setLoading]    = useState(true)
-  const [error,      setError]      = useState('')
-  const [filter,     setFilter]     = useState('all')
-  const [actionId,   setActionId]   = useState(null)
+  const [users, setUsers] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [filter, setFilter] = useState('all')
+  const [actionId, setActionId] = useState(null)
 
   const fetchUsers = useCallback(async () => {
     if (!supabase) return
@@ -741,8 +939,10 @@ function UsersTab() {
           <p className="admin-tab-subtitle">
             {users.length} registered user{users.length !== 1 ? 's' : ''}
             {pendingCount > 0 && (
-              <span style={{ marginLeft: 8, background: '#fef9c3', color: '#854d0e',
-                padding: '1px 8px', borderRadius: 99, fontSize: '0.78rem', fontWeight: 600 }}>
+              <span style={{
+                marginLeft: 8, background: '#fef9c3', color: '#854d0e',
+                padding: '1px 8px', borderRadius: 99, fontSize: '0.78rem', fontWeight: 600
+              }}>
                 {pendingCount} pending
               </span>
             )}
@@ -756,8 +956,8 @@ function UsersTab() {
       <div className="admin-filter-row">
         <div className="admin-filter-pills">
           {[
-            { k: 'all',      l: 'All'      },
-            { k: 'pending',  l: 'Pending'  },
+            { k: 'all', l: 'All' },
+            { k: 'pending', l: 'Pending' },
             { k: 'approved', l: 'Approved' },
             { k: 'rejected', l: 'Rejected' },
           ].map(f => (
@@ -766,8 +966,10 @@ function UsersTab() {
               onClick={() => setFilter(f.k)}>
               {f.l}
               {f.k === 'pending' && pendingCount > 0 && (
-                <span style={{ marginLeft: 5, background: '#ef4444', color: '#fff',
-                  borderRadius: 99, padding: '0 5px', fontSize: '0.7rem', fontWeight: 700 }}>
+                <span style={{
+                  marginLeft: 5, background: '#ef4444', color: '#fff',
+                  borderRadius: 99, padding: '0 5px', fontSize: '0.7rem', fontWeight: 700
+                }}>
                   {pendingCount}
                 </span>
               )}
@@ -778,7 +980,7 @@ function UsersTab() {
       </div>
 
       {loading && <div className="admin-loading"><div className="admin-spinner" /><span>Loading users…</span></div>}
-      {error   && <div className="admin-error-msg"><i className="bi bi-exclamation-triangle-fill" /> {error}</div>}
+      {error && <div className="admin-error-msg"><i className="bi bi-exclamation-triangle-fill" /> {error}</div>}
 
       {!loading && !error && (
         <div className="admin-table-wrapper">
@@ -798,8 +1000,8 @@ function UsersTab() {
                   <i className="bi bi-inbox me-2" />No users in this category.
                 </td></tr>
               ) : filtered.map(u => (
-                 <tr key={u.id}>
-                  <td><strong>{u.full_name || <span style={{color:'#aab'}}>—</span>}</strong></td>
+                <tr key={u.id}>
+                  <td><strong>{u.full_name || <span style={{ color: '#aab' }}>—</span>}</strong></td>
                   <td style={{ color: '#4b6070' }}>{u.email}</td>
                   <td><UserStatusBadge status={u.approval_status} /></td>
                   <td className="admin-date-cell">{fmt(u.created_at)}</td>
@@ -861,11 +1063,11 @@ function UsersTab() {
 // ROOT — Admin Page
 // ——————————————————————————————————————————————————————————————————————————————
 const TABS = [
-  { id: 'overview',  label: 'Overview',     icon: 'bi-grid-1x2'              },
-  { id: 'orders',    label: 'Orders',        icon: 'bi-clipboard2-pulse'      },
-  { id: 'medicines', label: 'Medicines',     icon: 'bi-capsule'               },
-  { id: 'robot',     label: 'Robot Status',  icon: 'bi-robot'                 },
-  { id: 'users',     label: 'User Approvals', icon: 'bi-people'               },
+  { id: 'overview', label: 'Overview', icon: 'bi-grid-1x2' },
+  { id: 'orders', label: 'Orders', icon: 'bi-clipboard2-pulse' },
+  { id: 'medicines', label: 'Medicines', icon: 'bi-capsule' },
+  { id: 'robot', label: 'Robot Status', icon: 'bi-robot' },
+  { id: 'users', label: 'User Approvals', icon: 'bi-people' },
 ]
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -873,17 +1075,17 @@ const TABS = [
 // Completely separate from the Supabase login page.
 // Credentials: email = "admin18", password = "admin@1234"
 // ──────────────────────────────────────────────────────────────────────────────
-const ADMIN_ID  = 'admin18'
+const ADMIN_ID = 'admin18'
 const ADMIN_PWD = 'admin@1234'
 const SESSION_KEY = 'medrover_admin_auth'
 
 function AdminLoginGate() {
-  const [authed,   setAuthed]   = useState(() => sessionStorage.getItem(SESSION_KEY) === 'true')
+  const [authed, setAuthed] = useState(() => sessionStorage.getItem(SESSION_KEY) === 'true')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPass, setShowPass] = useState(false)
-  const [error,    setError]    = useState('')
-  const [loading,  setLoading]  = useState(false)
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
 
   const handleLogin = (e) => {
@@ -1007,9 +1209,9 @@ function AdminLoginGate() {
 // ADMIN DASHBOARD (shown after successful admin login)
 // ──────────────────────────────────────────────────────────────────────────────
 function AdminDashboard({ onLock }) {
-  const [activeTab,   setActiveTab]   = useState('overview')
+  const [activeTab, setActiveTab] = useState('overview')
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [time,        setTime]        = useState(new Date())
+  const [time, setTime] = useState(new Date())
 
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 30_000)
@@ -1086,11 +1288,11 @@ function AdminDashboard({ onLock }) {
 
         {/* Content */}
         <div className="admin-content">
-          {activeTab === 'overview'  && <OverviewTab />}
-          {activeTab === 'orders'    && <OrdersTab />}
+          {activeTab === 'overview' && <OverviewTab />}
+          {activeTab === 'orders' && <OrdersTab />}
           {activeTab === 'medicines' && <MedicinesTab />}
-          {activeTab === 'robot'     && <RobotTab />}
-          {activeTab === 'users'     && <UsersTab />}
+          {activeTab === 'robot' && <RobotTab />}
+          {activeTab === 'users' && <UsersTab />}
         </div>
       </main>
     </div>
