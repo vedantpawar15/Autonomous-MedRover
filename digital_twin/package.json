@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:portal": "vite build --base /twin/ --outDir ../web_portal/public/twin --emptyOutDir",
     "lint": "oxlint",
     "preview": "vite preview"
   },

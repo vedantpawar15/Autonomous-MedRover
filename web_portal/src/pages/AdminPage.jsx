@@ -554,6 +554,9 @@ function RobotTab() {
   const [isFullscreen, setIsFullscreen] = useState(false)
   const twinCardRef = useRef(null)
 
+  const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  const twinUrl = import.meta.env.VITE_TWIN_URL || '/twin/'
+
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
       twinCardRef.current?.requestFullscreen().catch(() => { })
@@ -611,7 +614,7 @@ function RobotTab() {
             <i className={`bi ${isFullscreen ? 'bi-fullscreen-exit' : 'bi-arrows-fullscreen'}`} /> {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
           </button>
           <a
-            href="http://localhost:5173"
+            href={twinUrl}
             target="_blank"
             rel="noreferrer"
             className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1.5"
@@ -657,8 +660,9 @@ function RobotTab() {
             <span style={{ fontSize: '0.82rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#38bdf8' }}>
               Live 3D Digital Twin &bull; Real-Time View
             </span>
-            <span className="badge bg-dark border border-secondary text-info" style={{ fontSize: '0.7rem' }}>
-              Port 5173
+            <span className="badge bg-dark border border-secondary text-info d-inline-flex align-items-center gap-1" style={{ fontSize: '0.7rem' }}>
+              <i className="bi bi-cpu" />
+              {isLocal && import.meta.env.VITE_TWIN_URL ? 'Port 5173' : '3D Live Engine'}
             </span>
 
             {telemetry && (
@@ -704,7 +708,7 @@ function RobotTab() {
         {/* 3D Simulation Frame - auto-flexes to exact 100% available viewport space */}
         <iframe
           key={twinKey}
-          src="http://localhost:5173"
+          src={twinUrl}
           title="MedRover 3D Digital Twin Simulator"
           style={{
             flex: 1,
