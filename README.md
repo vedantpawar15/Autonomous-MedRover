@@ -18,13 +18,14 @@
 - [Repository Structure](#-repository-structure)
 - [Getting Started & Installation](#-getting-started--installation)
   - [Prerequisites](#prerequisites)
-  - [1. Web Portal Setup](#1-web-portal-setup)
-  - [2. Digital Twin Setup](#2-digital-twin-setup)
+  - [1. Web Portal Setup (`http://localhost:3000`)](#1-web-portal-setup)
+  - [2. Digital Twin Setup (`http://localhost:5173`)](#2-digital-twin-setup)
   - [3. ESP32 Firmware Setup](#3-esp32-firmware-setup)
   - [4. Netlify Deployment](#4-netlify-deployment)
 - [Firmware Serial CLI & PID Tuning](#-firmware-serial-cli--pid-tuning)
 - [Offline Resilience & Sync Engine](#-offline-resilience--sync-engine)
 - [Roadmap & Future Improvements](#-roadmap--future-improvements)
+- [License](#-license)
 
 ---
 
@@ -34,7 +35,7 @@
 
 Instead of requiring expensive SLAM lidar platforms, MedRover utilizes a high-reliability **5-channel IR line-following architecture** with real-time junction arbitration, motor kick compensation, wobble recovery, and automated U-turn return-to-dock logic. The entire system is linked via Supabase cloud infrastructure to:
 
-1. **Staff Web Portal**: Allows nurses and hospital staff to place medicine orders, select target wards (Rooms A, B, C), manage pharmacy inventories, and track active deliveries.
+1. **Staff Web Portal**: Allows nurses and hospital staff to place medicine orders, select target wards (Rooms A, B, C), manage pharmacy inventories, repeat previous orders, and track active deliveries.
 2. **3D Digital Twin**: Renders a live Three.js virtual model of the hospital floor and rover, syncing live coordinates, yaw, battery, and Wi-Fi RSSI over Supabase Realtime channels.
 3. **Hardware Rover**: An ESP32 microcontroller with DC gear motors and IR sensors that autonomously polls pending tasks, navigates to target rooms, waits for unloading, and returns home.
 
@@ -49,26 +50,27 @@ flowchart TD
         Admin[Pharmacy Admin]
     end
 
-    subgraph Web Portal (React + Vite)
+    subgraph Web Portal (React 18 + Vite - Port 3000)
         UI[Catalog & Cart UI]
         RoomSelect[Room Selector: A, B, C]
-        LiveOrders[Live Orders Dashboard]
-        AdminPanel[Admin Inventory & Dispatch Panel]
+        LiveOrders[Live Orders Dashboard + Repeat Order]
+        AdminPanel[Admin Dashboard: Inventory, Users & 3D Twin]
         SyncEngine[Offline Sync Queue & Local Cache]
     end
 
     subgraph Cloud Backend (Supabase)
         DB_Orders[(orders Table)]
         DB_Items[(order_items Table)]
+        DB_Meds[(medicines Table)]
         DB_Rover[(rover_status Table)]
         RT[Supabase Realtime WebSockets]
     end
 
-    subgraph Digital Twin (React + Three.js)
+    subgraph Digital Twin (React 19 + Three.js - Port 5173)
         Scene3D[3D Hospital Corridor Scene]
         Rover3D[Rover 3D Mesh + Sensors]
         HUD[Telemetry HUD: Battery, RSSI, Yaw, X/Z]
-        CamDirector[Multi-Camera Director: Free / Top-Down / Follow]
+        CamDirector[Multi-Camera Director: Free / Top-Down / Follow / Walk]
     end
 
     subgraph Physical Rover (ESP32)
@@ -81,6 +83,7 @@ flowchart TD
 
     Staff --> UI --> RoomSelect --> SyncEngine
     Admin --> AdminPanel --> DB_Orders
+    AdminPanel -.->|Embedded Fullscreen Iframe| Scene3D
     SyncEngine -->|REST / Realtime| DB_Orders
     SyncEngine -->|REST| DB_Items
 
@@ -101,31 +104,43 @@ flowchart TD
 ## ⚡ Key Features by Subsystem
 
 ### 1. Web Portal (`web_portal/`)
-- **Modern Healthcare UI**: Built with React 18, Vite, Bootstrap 5, and Bootstrap Icons.
+- **Modern Healthcare UI**: Built with React 18, Vite, Bootstrap 5, and Bootstrap Icons. Configured on **port `3000`**.
 - **Role & Auth Flow**: Supabase Auth support (login, registration, guest browsing mode, and protected checkout routes).
 - **Medicine Directory**: Interactive search catalog (`/search`), category filters, dosage info, stock availability, and dynamic cart badges.
 - **Ward / Room Selection**: Visual room dispatch interface (`/select-room`) routing deliveries to Room A (General), Room B (ICU), or Room C (Pediatric).
+- **Fast Re-ordering & Orders Management (`/orders`)**:
+  - **Repeat Order Workflow**: Instant repeat order button on every past order that pre-fills and confirms the exact room destination and medicine items.
+  - **Rich Medicine Confirmation Cards**: Modal preview matches the cart layout with a 72×72px soft icon container, green capsule icon, medicine title, tablet/pack details, and prominent bold price in ₹ INR.
+  - **Custom Delete Confirmation Modal**: Replaced browser `window.confirm` with a dedicated red-accented modal featuring an irreversible deletion warning banner.
+  - **Clean Access Control**: 3D Twin tracking links removed from top navigation, order lists, and order success screens—centralized exclusively into the Admin Command Center.
 - **Admin Command Center (`/admin`)**:
-  - Live inventory management (edit prices, update stock counts, add new medicines).
-  - Complete order history with real-time status badges (`pending`, `in_transit`, `delivered`, `cancelled`).
-  - Manual dispatch overrides and single-click order status toggling.
+  - **Split-Screen PIN Gate**: Protected admin login with a dedicated enterprise split-screen access screen.
+  - **Live Inventory Management**: Add, edit, and delete medicines, update MRP prices, pack details, and prescription requirements.
+  - **Order History & Status Toggling**: Real-time status badges (`pending`, `in_transit`, `delivered`), search filtering, and single-click order management.
+  - **User Approvals Management**: Approve, reject, or review hospital staff account registrations using Supabase Security Definer RPCs (`admin_get_all_users`, `admin_set_user_status`).
+  - **Embedded 3D Digital Twin Viewer**:
+    - Embedded 3D Digital Twin on port `5173` with flexbox viewport-height fitting (`calc(100vh - 56px)`) and zero outer scrollbars.
+    - Native HTML5 Fullscreen API toggle ("Fullscreen" / "Exit Fullscreen") for true edge-to-edge 3D monitoring.
+    - Real-time reload button and popout new-tab link.
+    - Compact live telemetry chips (speed, battery, target room) integrated into the twin header bar.
 - **Offline Resilience (`syncQueue.js` & `deliveryCache.js`)**:
-  - Automatically captures orders and operations in `localStorage` if Wi-Fi drops.
+  - Automatically captures orders and status operations in `localStorage` if Wi-Fi drops.
   - Displays a global `OfflineBanner.jsx` warning to hospital personnel.
   - Automatically flushes and synchronizes all queued operations as soon as connectivity is restored.
 
 ### 2. 3D Digital Twin Simulator (`digital_twin/`)
-- **Real-Time 3D Hospital Visualization**: Powered by React 19, `@react-three/fiber`, and `@react-three/drei`.
-- **Accurate Floorplan**: Modeled corridors, docking base, junction intersections (J1, J2, J3), and destination patient rooms (A, B, C).
+- **Real-Time 3D Hospital Visualization**: Powered by React 19, Vite, Tailwind CSS v4, Three.js, `@react-three/fiber`, and `@react-three/drei`. Configured on **port `5173`**.
+- **Accurate Floorplan**: Modeled corridors, docking base, junction intersections (J1, J2, J3), and destination patient rooms (A, B, C) with luminous guidance floor tracks.
 - **Dynamic Rover Mesh**: Features functional rotating drive wheels, front caster, animated LIDAR scanner beam, and dual LED headlights with glowing guidance lines.
 - **Supabase Realtime Sync**: Subscribes to `rover_status` and `orders` channels to sync virtual rover position with physical rover telemetry in real time.
 - **Multi-Camera Director**:
-  - **Free Orbit**: Full 3D pan, zoom, and tilt around the hospital.
-  - **Top-Down (2D Map)**: Overhead floorplan view for mission oversight.
+  - **Free Orbit (CAD Orbit)**: Full 3D pan, zoom, and tilt around the hospital.
+  - **Top-Down (2D Plan)**: Overhead floorplan view for mission oversight.
   - **Follow Rover**: 3rd-person chase camera locked behind the rover during transit.
+  - **3D Game Walk**: Immersive first-person / third-person walk mode with keyboard WASD controls.
 - **Interactive Telemetry HUD**:
-  - Displays battery voltage/percentage, Wi-Fi RSSI (dBm), (X, Z) coordinates, yaw angle, velocity, and mission progress.
-  - One-click manual dispatch triggers (Room A, Room B, Room C), emergency stop, and return-to-base commands.
+  - Displays battery voltage/percentage, Wi-Fi RSSI (dBm), (X, Z) coordinates, yaw angle, velocity, ETA, and mission progress.
+  - One-click manual dispatch triggers (Room A, Room B, Room C), emergency stop, speed multipliers (1x–3x), wireframe view toggle, and return-to-base commands.
   - Built-in simulation toggle for testing without active hardware connected.
 
 ### 3. ESP32 Autonomous Hardware Rover (`hardware_esp32/`)
@@ -203,11 +218,12 @@ The system relies on PostgreSQL hosted on Supabase with Realtime publication ena
 ### 1. `orders` Table
 ```sql
 create table public.orders (
-  id uuid default gen_random_uuid() primary key,
+  id bigint generated by default as identity primary key,
   user_id uuid references auth.users(id) on delete set null,
   room_code text not null,                -- 'A', 'B', or 'C'
-  room_label text,                       -- e.g. 'General Ward', 'ICU', 'Pediatrics'
+  room_label text,                       -- e.g. 'Room A - General Ward', 'Room B - ICU Ward'
   status text not null default 'pending', -- 'pending', 'in_transit', 'delivered', 'cancelled'
+  notes text,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
@@ -218,16 +234,32 @@ alter publication supabase_realtime add table public.orders;
 ### 2. `order_items` Table
 ```sql
 create table public.order_items (
-  id uuid default gen_random_uuid() primary key,
-  order_id uuid references public.orders(id) on delete cascade not null,
-  medicine_id text not null,
+  id bigint generated by default as identity primary key,
+  order_id bigint references public.orders(id) on delete cascade not null,
+  medicine_id bigint references public.medicines(id) on delete set null,
   quantity integer not null default 1,
   unit_price numeric(10,2) default 0,
   mrp numeric(10,2) default 0
 );
 ```
 
-### 3. `rover_status` Table (Optional Live Telemetry Feed)
+### 3. `medicines` Table
+```sql
+create table public.medicines (
+  id bigint generated by default as identity primary key,
+  name text not null,
+  brand text,
+  pack_info text,                        -- e.g. '25' or '15 tablets in 1 strip'
+  category text,
+  image_url text,
+  mrp numeric(10,2) not null default 0,
+  requires_rx boolean default false,
+  stock_count integer default 100,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+```
+
+### 4. `rover_status` Table (Live Telemetry Feed)
 ```sql
 create table public.rover_status (
   id text primary key default 'rover-01',
@@ -235,7 +267,7 @@ create table public.rover_status (
   wifi_rssi integer default -60,
   state text default 'idle',             -- 'idle', 'in_transit', 'delivered', 'returning_to_base', 'error'
   target_room text,                      -- 'A', 'B', 'C'
-  order_id uuid references public.orders(id),
+  order_id bigint references public.orders(id),
   yaw numeric(6,2) default 0.0,
   pos_x numeric(6,2) default 0.0,
   pos_z numeric(6,2) default 0.0,
@@ -258,9 +290,9 @@ Autonomous-MedRover/
 ├── CODE_EXAMPLES.md                        # Quick reference code snippets & adaptations
 ├── JAVASCRIPT_LEARNING_GUIDE.md            # Modern JavaScript concepts used in the portal
 │
-├── web_portal/                             # React + Vite Healthcare Ordering Portal
+├── web_portal/                             # React 18 + Vite Healthcare Ordering Portal (Port 3000)
 │   ├── package.json                        # Dependencies (React 18, Bootstrap 5, Supabase-js)
-│   ├── vite.config.js                      # Vite bundler config
+│   ├── vite.config.js                      # Vite bundler config (port 3000)
 │   ├── .env.example                        # Template for Supabase credentials
 │   ├── src/
 │   │   ├── main.jsx                        # React entry point
@@ -268,7 +300,7 @@ Autonomous-MedRover/
 │   │   ├── components/
 │   │   │   ├── OfflineBanner.jsx           # Network status alert banner
 │   │   │   ├── ProtectedRoute.jsx          # Route guard for authenticated users
-│   │   │   ├── Navbar.jsx                  # Top navigation bar
+│   │   │   ├── Navbar.jsx                  # Top navigation bar (3D twin exclusive to admin)
 │   │   │   └── Footer.jsx                  # Footer component
 │   │   ├── contexts/
 │   │   │   └── AuthContext.jsx             # Supabase Auth user state provider
@@ -283,13 +315,13 @@ Autonomous-MedRover/
 │   │       ├── CartPage.jsx                # Cart item review & quantity adjustments
 │   │       ├── SelectRoomPage.jsx          # Ward & room selection checkout step
 │   │       ├── OrderSuccessPage.jsx        # Dispatch confirmation screen
-│   │       ├── OrdersPage.jsx              # Active & past order status tracker
-│   │       ├── AdminPage.jsx               # Pharmacy admin, stock editor & order override
+│   │       ├── OrdersPage.jsx              # Order history, custom repeat modal & delete modal
+│   │       ├── AdminPage.jsx               # Inventory, approvals, split PIN gate & 3D twin viewer
 │   │       └── LoginPage.jsx               # Staff & user login/registration
 │
-├── digital_twin/                           # Three.js 3D Simulation & Telemetry HUD
-│   ├── package.json                        # Dependencies (React 19, Three.js, R3F, Drei)
-│   ├── vite.config.js                      # Vite bundler config
+├── digital_twin/                           # Three.js 3D Simulation & Telemetry HUD (Port 5173)
+│   ├── package.json                        # Dependencies (React 19, Three.js, R3F, Drei, Lucide)
+│   ├── vite.config.js                      # Vite bundler config with Tailwind v4
 │   ├── src/
 │   │   ├── App.jsx                         # Main 3D viewport & HUD overlay container
 │   │   ├── components/
@@ -319,7 +351,7 @@ Autonomous-MedRover/
 - **Node.js**: v18.0 or higher
 - **npm** or **yarn**
 - **Arduino IDE**: v2.0+ with **ESP32 by Espressif Systems** board package installed
-- **Supabase Account**: A free project at [supabase.com](https://supabase.com)
+- **Supabase Account**: A project at [supabase.com](https://supabase.com)
 
 ---
 
@@ -346,7 +378,7 @@ Start the development server:
 ```bash
 npm run dev
 ```
-The web portal will open at `http://localhost:5173`.
+The web portal will open at **`http://localhost:3000`** (pre-configured in `vite.config.js`).
 
 ---
 
@@ -371,9 +403,9 @@ VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 Run the Digital Twin application:
 ```bash
-npm run dev -- --port 5174
+npm run dev
 ```
-Access the 3D twin simulator at `http://localhost:5174`.
+Access the 3D twin simulator directly at **`http://localhost:5173`** (or view it embedded inside the `/admin` portal).
 
 ---
 

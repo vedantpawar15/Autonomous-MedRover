@@ -41,7 +41,8 @@ VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 
 Run development server:
 ```bash
-npm run dev -- --port 5174
+npm run dev
 ```
 
-Access the 3D twin in your browser at `http://localhost:5174`.
+Access the 3D twin in your browser at `http://localhost:5173` (also embedded in the Web Portal's Admin Dashboard).
+
