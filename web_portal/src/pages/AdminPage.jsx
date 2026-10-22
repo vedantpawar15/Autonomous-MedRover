@@ -6,8 +6,6 @@ import {
   getCachedOrders,
   updateCachedOrderStatus,
   removeCachedOrder,
-  getActiveDelivery,
-  cacheActiveDelivery,
 } from '../lib/deliveryCache'
 import { enqueue } from '../lib/syncQueue'
 
@@ -551,65 +549,43 @@ function MedicinesTab() {
 // ROBOT TAB
 // ——————————————————————————————————————————————————————————————————————————————
 function RobotTab() {
-  const [active, setActive] = useState(getActiveDelivery)
-  const [recent, setRecent] = useState(() => getCachedOrders().slice(0, 8))
-  const [loading, setLoading] = useState(false)
   const [telemetry, setTelemetry] = useState(null)
-  const [dispatching, setDispatching] = useState(false)
   const [twinKey, setTwinKey] = useState(0)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const twinCardRef = useRef(null)
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      twinCardRef.current?.requestFullscreen().catch(() => { })
+    } else {
+      document.exitFullscreen().catch(() => { })
+    }
+  }
+
+  useEffect(() => {
+    const onFsChange = () => setIsFullscreen(!!document.fullscreenElement)
+    document.addEventListener('fullscreenchange', onFsChange)
+    return () => document.removeEventListener('fullscreenchange', onFsChange)
+  }, [])
 
   const fetchStatus = useCallback(async () => {
-    const cachedActive = getActiveDelivery()
-    if (cachedActive) setActive(cachedActive)
-    const cachedOrders = getCachedOrders()
-    if (cachedOrders && cachedOrders.length > 0) {
-      setRecent(cachedOrders.slice(0, 8))
-    }
-
-    if (!supabase || !navigator.onLine) {
-      return
-    }
-
-    setLoading(true)
+    if (!supabase || !navigator.onLine) return
     try {
-      const [aRes, rRes, tRes] = await Promise.all([
-        supabase.from('orders').select('*').in('status', ['pending', 'in_transit'])
-          .order('created_at', { ascending: false }).limit(1),
-        supabase.from('orders').select('*')
-          .order('created_at', { ascending: false }).limit(8),
-        supabase.from('rover_status').select('*').limit(1),
-      ])
-      const activeOrd = aRes.data?.[0] || null
-      setActive(activeOrd)
-      if (activeOrd) {
-        cacheActiveDelivery(activeOrd)
-      }
-      setRecent(rRes.data || [])
-      if (tRes.data?.[0]) {
-        setTelemetry(tRes.data[0])
-      }
+      const { data } = await supabase.from('rover_status').select('*').limit(1)
+      if (data?.[0]) setTelemetry(data[0])
     } catch (e) {
       console.error(e)
-    } finally {
-      setLoading(false)
     }
   }, [])
 
-  // Initial fetch and Realtime Supabase Subscription
   useEffect(() => {
     fetchStatus()
-
     if (!supabase) return
 
     const channel = supabase
       .channel('admin_robot_tracker')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
-        fetchStatus()
-      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'rover_status' }, (payload) => {
-        if (payload.new) {
-          setTelemetry(payload.new)
-        }
+        if (payload.new) setTelemetry(payload.new)
       })
       .subscribe()
 
@@ -618,60 +594,30 @@ function RobotTab() {
     }
   }, [fetchStatus])
 
-  // Quick dispatch action directly from Admin page
-  const handleQuickDispatch = async (roomCode, roomLabel) => {
-    if (!supabase) {
-      alert('Supabase is not configured.')
-      return
-    }
-
-    setDispatching(true)
-    try {
-      const { data, error } = await supabase
-        .from('orders')
-        .insert({
-          room_code: roomCode,
-          room_label: roomLabel,
-          status: 'pending',
-          notes: 'Dispatched via Admin Live Control'
-        })
-        .select('*')
-        .single()
-
-      if (error) throw error
-      setActive(data)
-      cacheActiveDelivery(data)
-      fetchStatus()
-    } catch (err) {
-      alert('Error dispatching mission: ' + err.message)
-    } finally {
-      setDispatching(false)
-    }
-  }
-
-  const fmt = (d) => new Date(d).toLocaleString('en-IN', {
-    day: '2-digit', month: 'short', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  })
-
-  const isActive = !!active
-
   return (
-    <div>
-      <div className="admin-tab-header">
+    <div className="d-flex flex-column h-100" style={{ flex: 1, minHeight: 0 }}>
+      <div className="admin-tab-header mb-2" style={{ flexShrink: 0 }}>
         <div>
           <h4 className="admin-tab-title">Robot Status & 3D Digital Twin</h4>
           <p className="admin-tab-subtitle">Live MedRover autonomous delivery tracking synced with hardware</p>
         </div>
         <div className="d-flex align-items-center gap-2">
+          <button
+            type="button"
+            className="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1.5"
+            onClick={toggleFullscreen}
+            style={{ borderRadius: '8px', fontWeight: 600 }}
+          >
+            <i className={`bi ${isFullscreen ? 'bi-fullscreen-exit' : 'bi-arrows-fullscreen'}`} /> {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+          </button>
           <a
             href="http://localhost:5173"
             target="_blank"
             rel="noreferrer"
-            className="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1.5"
+            className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1.5"
             style={{ borderRadius: '8px', fontWeight: 600 }}
           >
-            <i className="bi bi-box-arrow-up-right" /> Open 3D Twin Fullscreen
+            <i className="bi bi-box-arrow-up-right" /> Open in New Tab
           </a>
           <button className="admin-refresh-btn" onClick={fetchStatus}>
             <i className="bi bi-arrow-clockwise" /> Refresh
@@ -679,191 +625,98 @@ function RobotTab() {
         </div>
       </div>
 
-      {loading && !active ? (
-        <div className="admin-loading"><div className="admin-spinner" /><span>Checking robot status…</span></div>
-      ) : (
-        <>
-          {/* Active Mission Status Card */}
-          <div className={`robot-status-card ${isActive ? 'active' : 'idle'} mb-4`}>
-            <div className="robot-status-icon-wrap">
-              <i className="bi bi-robot" />
-              {isActive && <span className="robot-pulse-ring" />}
-            </div>
-            <div className="robot-status-info">
-              <h5 className="robot-status-label">
-                <span className={`robot-status-dot ${isActive ? 'green' : 'grey'}`} />
-                {isActive ? `MedRover is Active (${active.status?.toUpperCase()})` : 'MedRover is Idle at Base Dock'}
-              </h5>
-              {isActive ? (
-                <div className="robot-active-details">
-                  <p>
-                    Delivering <strong>Order #{active.id}</strong> to{' '}
-                    <strong>Room {active.room_code}</strong>
-                    {active.room_label && ` · ${active.room_label}`}
-                  </p>
-                  <p style={{ marginTop: 4, fontSize: '0.8rem', color: '#8a9bae' }}>
-                    Dispatched {fmt(active.created_at)} · Status: <strong>{active.status}</strong>
-                  </p>
-                </div>
-              ) : (
-                <p style={{ color: '#8a9bae', fontSize: '0.88rem', margin: 0 }}>
-                  No active delivery. Robot is docked at Base Charging Pad and waiting for orders.
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Quick Hardware Dispatch Panel */}
-          <div className="sidebar-card mb-4" style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '18px' }}>
-            <div className="d-flex align-items-center justify-between mb-2">
-              <div className="d-flex align-items-center gap-2">
-                <i className="bi bi-send-fill text-primary" />
-                <span className="fw-bold text-dark" style={{ fontSize: '0.95rem' }}>Direct Mission Dispatch (Triggers Real ESP32 & 3D Twin)</span>
-              </div>
-              <span className="badge bg-primary-subtle text-primary">Live Hardware Sync</span>
-            </div>
-            <p className="text-muted small mb-3">
-              Clicking a destination inserts an order into Supabase, instantly notifying the physical rover over Wi-Fi and driving the 3D Digital Twin.
-            </p>
-            <div className="d-flex gap-2 flex-wrap">
-              <button
-                type="button"
-                className="btn btn-outline-primary btn-sm d-flex align-items-center gap-1.5 px-3 py-2"
-                onClick={() => handleQuickDispatch('A', 'Room A - General Ward')}
-                disabled={dispatching || isActive}
-                style={{ borderRadius: '10px', fontWeight: 600 }}
-              >
-                <i className="bi bi-play-circle-fill text-primary" /> Dispatch Room A (General)
-              </button>
-              <button
-                type="button"
-                className="btn btn-outline-danger btn-sm d-flex align-items-center gap-1.5 px-3 py-2"
-                onClick={() => handleQuickDispatch('B', 'Room B - ICU Ward')}
-                disabled={dispatching || isActive}
-                style={{ borderRadius: '10px', fontWeight: 600 }}
-              >
-                <i className="bi bi-play-circle-fill text-danger" /> Dispatch Room B (ICU)
-              </button>
-              <button
-                type="button"
-                className="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1.5 px-3 py-2"
-                onClick={() => handleQuickDispatch('C', 'Room C - Pediatric Ward')}
-                disabled={dispatching || isActive}
-                style={{ borderRadius: '10px', fontWeight: 600 }}
-              >
-                <i className="bi bi-play-circle-fill text-secondary" /> Dispatch Room C (Pediatric)
-              </button>
-            </div>
-          </div>
-
-          {/* 3D Digital Twin Live Embedded View */}
-          <div className="mb-4" style={{ borderRadius: '16px', overflow: 'hidden', border: '1px solid #0f172a', background: '#090d16', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)' }}>
-            <div className="d-flex align-items-center justify-between px-3 py-2" style={{ background: '#0f172a', borderBottom: '1px solid #1e293b' }}>
-              <div className="d-flex align-items-center gap-2 text-white">
-                <span className="w-2 h-2 rounded-full bg-success animate-pulse" style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981' }} />
-                <span style={{ fontSize: '0.82rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#38bdf8' }}>
-                  Live 3D Digital Twin &bull; Real-Time View
-                </span>
-                <span className="badge bg-dark border border-secondary text-info" style={{ fontSize: '0.7rem' }}>
-                  Port 5173
-                </span>
-              </div>
-              <div className="d-flex align-items-center gap-2">
-                <button
-                  type="button"
-                  className="btn btn-sm btn-dark text-muted py-0 px-2"
-                  onClick={() => setTwinKey((k) => k + 1)}
-                  title="Reload 3D View"
-                  style={{ fontSize: '0.75rem', border: '1px solid #334155' }}
-                >
-                  <i className="bi bi-arrow-clockwise me-1" /> Reload
-                </button>
-                <a
-                  href="http://localhost:5173"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="btn btn-sm btn-info py-0 px-2 text-dark fw-bold"
-                  style={{ fontSize: '0.75rem' }}
-                >
-                  <i className="bi bi-arrows-fullscreen me-1" /> Expand
-                </a>
-              </div>
-            </div>
-
-            <iframe
-              key={twinKey}
-              src="http://localhost:5173"
-              title="MedRover 3D Digital Twin Simulator"
+      <div
+        ref={twinCardRef}
+        className="d-flex flex-column"
+        style={{
+          flex: 1,
+          minHeight: 0,
+          borderRadius: isFullscreen ? 0 : '14px',
+          overflow: 'hidden',
+          border: '1px solid #1e293b',
+          background: '#090d16',
+          boxShadow: isFullscreen ? 'none' : '0 12px 30px -4px rgba(0, 0, 0, 0.35)',
+        }}
+      >
+        {/* Digital Twin Header Bar */}
+        <div
+          className="d-flex align-items-center justify-content-between px-3 py-2"
+          style={{ background: '#0f172a', borderBottom: '1px solid #1e293b', flexShrink: 0 }}
+        >
+          <div className="d-flex align-items-center gap-2 text-white">
+            <span
               style={{
-                width: '100%',
-                height: '520px',
-                border: 'none',
-                display: 'block',
-                background: '#090d16'
+                display: 'inline-block',
+                width: '9px',
+                height: '9px',
+                borderRadius: '50%',
+                backgroundColor: '#10b981',
+                boxShadow: '0 0 8px #10b981'
               }}
             />
+            <span style={{ fontSize: '0.82rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#38bdf8' }}>
+              Live 3D Digital Twin &bull; Real-Time View
+            </span>
+            <span className="badge bg-dark border border-secondary text-info" style={{ fontSize: '0.7rem' }}>
+              Port 5173
+            </span>
+
+            {telemetry && (
+              <div className="d-none d-md-flex align-items-center gap-2 ms-2">
+                <span className="badge bg-dark border border-secondary text-light" style={{ fontSize: '0.72rem', fontWeight: 500 }}>
+                  <i className="bi bi-speedometer2 text-info me-1" />
+                  {telemetry.speed || 0} m/s
+                </span>
+                <span className="badge bg-dark border border-secondary text-light" style={{ fontSize: '0.72rem', fontWeight: 500 }}>
+                  <i className="bi bi-battery-charging text-success me-1" />
+                  {telemetry.battery || 100}%
+                </span>
+                <span className="badge bg-dark border border-secondary text-light" style={{ fontSize: '0.72rem', fontWeight: 500 }}>
+                  <i className="bi bi-geo-alt-fill text-warning me-1" />
+                  {telemetry.target_room ? `Room ${telemetry.target_room}` : 'Dock Station'}
+                </span>
+              </div>
+            )}
           </div>
 
-          {/* Live Telemetry Data Feed */}
-          {telemetry && (
-            <div className="row g-3 mb-4">
-              <div className="col-6 col-md-3">
-                <div className="p-3 rounded-3 border bg-white shadow-sm">
-                  <div className="text-muted small text-uppercase fw-bold">Live Speed</div>
-                  <div className="fs-5 fw-bold text-dark">{telemetry.speed || 0} m/s</div>
-                  <small className="text-muted">{((telemetry.speed || 0) * 3.6).toFixed(1)} km/h</small>
-                </div>
-              </div>
-              <div className="col-6 col-md-3">
-                <div className="p-3 rounded-3 border bg-white shadow-sm">
-                  <div className="text-muted small text-uppercase fw-bold">Coordinates (X, Z)</div>
-                  <div className="fs-5 fw-bold text-primary font-monospace">{telemetry.pos_x || 0}, {telemetry.pos_z || 0}</div>
-                  <small className="text-muted">Yaw: {Math.round(telemetry.yaw || 0)}°</small>
-                </div>
-              </div>
-              <div className="col-6 col-md-3">
-                <div className="p-3 rounded-3 border bg-white shadow-sm">
-                  <div className="text-muted small text-uppercase fw-bold">Battery</div>
-                  <div className="fs-5 fw-bold text-success">{telemetry.battery || 100}%</div>
-                  <small className="text-muted">Li-ion 2S Pack</small>
-                </div>
-              </div>
-              <div className="col-6 col-md-3">
-                <div className="p-3 rounded-3 border bg-white shadow-sm">
-                  <div className="text-muted small text-uppercase fw-bold">Target Room</div>
-                  <div className="fs-5 fw-bold text-info">{telemetry.target_room ? `Room ${telemetry.target_room}` : 'Dock Station'}</div>
-                  <small className="text-muted">State: {telemetry.state || 'idle'}</small>
-                </div>
-              </div>
-            </div>
-          )}
+          <div className="d-flex align-items-center gap-2">
+            <button
+              type="button"
+              className="btn btn-sm btn-dark text-muted py-0 px-2"
+              onClick={() => setTwinKey((k) => k + 1)}
+              title="Reload 3D View"
+              style={{ fontSize: '0.75rem', border: '1px solid #334155' }}
+            >
+              <i className="bi bi-arrow-clockwise me-1" /> Reload
+            </button>
+            <button
+              type="button"
+              className="btn btn-sm btn-info py-0 px-2 text-dark fw-bold"
+              onClick={toggleFullscreen}
+              style={{ fontSize: '0.75rem' }}
+            >
+              <i className={`bi ${isFullscreen ? 'bi-fullscreen-exit' : 'bi-arrows-fullscreen'} me-1`} />
+              {isFullscreen ? 'Exit' : 'Expand'}
+            </button>
+          </div>
+        </div>
 
-          {/* Recent Deliveries */}
-          {recent.length > 0 && (
-            <>
-              <h6 className="admin-section-subtitle mb-3">Recent Deliveries</h6>
-              <div className="robot-timeline">
-                {recent.map((o, idx) => (
-                  <div className="robot-timeline-item" key={o.id}>
-                    <div className={`robot-timeline-dot ${o.status}`} />
-                    {idx < recent.length - 1 && <div className="robot-timeline-line" />}
-                    <div className="robot-timeline-content">
-                      <div className="robot-timeline-title">
-                        Order #{o.id} → Room {o.room_code}
-                        <StatusBadge status={o.status} />
-                      </div>
-                      <div className="robot-timeline-date">
-                        {fmt(o.created_at)}
-                        {o.room_label && <span style={{ marginLeft: 8, color: '#b0bac5' }}>· {o.room_label}</span>}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </>
-      )}
+        {/* 3D Simulation Frame - auto-flexes to exact 100% available viewport space */}
+        <iframe
+          key={twinKey}
+          src="http://localhost:5173"
+          title="MedRover 3D Digital Twin Simulator"
+          style={{
+            flex: 1,
+            width: '100%',
+            height: '100%',
+            minHeight: 0,
+            border: 'none',
+            display: 'block',
+            background: '#090d16'
+          }}
+        />
+      </div>
     </div>
   )
 }
@@ -1287,7 +1140,7 @@ function AdminDashboard({ onLock }) {
         </div>
 
         {/* Content */}
-        <div className="admin-content">
+        <div className={`admin-content${activeTab === 'robot' ? ' admin-content-robot' : ''}`}>
           {activeTab === 'overview' && <OverviewTab />}
           {activeTab === 'orders' && <OrdersTab />}
           {activeTab === 'medicines' && <MedicinesTab />}
