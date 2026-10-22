@@ -3,6 +3,10 @@
   command = "npm run build"
   publish = "dist"
 
+[build.environment]
+  SECRETS_SCAN_OMIT_KEYS = "VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY"
+  SECRETS_SCAN_OMIT_PATHS = "dist/**,dist/assets/**"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
